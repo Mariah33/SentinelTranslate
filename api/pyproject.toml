@@ -1,8 +1,8 @@
 [project]
-name = "translation-sidecar"
+name = "translation-frontend"
 version = "0.1.0"
-description = "FastAPI sidecar for OPUS-MT Triton translation using Celery"
-requires-python = ">=3.10"
+description = "FastAPI frontend for batch translation jobs from S3 parquet files"
+requires-python = ">=3.11"
 
 classifiers = [
     "Operating System :: MacOS",
@@ -15,21 +15,18 @@ dependencies = [
     "pydantic",
     "celery",
     "redis",
-    "boto3",
-    "tritonclient[http]",
-    "gevent<25.0.0",  # Pin to version with pre-built wheels for macOS
 ]
 
 [project.optional-dependencies]
-# Development dependencies
 dev = [
   "ruff",
   "basedpyright",
   "pytest",
+  "httpx",
 ]
 
 [tool.ruff]
-line-length = 140
+line-length = 120
 indent-width = 4
 target-version = "py311"
 lint.select = ["E","F","I","N","UP","B","A","C4"]
@@ -37,7 +34,7 @@ lint.ignore = ["E501"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
-known-first-party = ["sidecar"]
+known-first-party = ["frontend"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -58,12 +55,13 @@ addopts = "-q"
 [tool.app]
 module = "app:app"
 host = "0.0.0.0"
-port = 8080
+port = 8090
 reload = true
 
 [dependency-groups]
 dev = [
     "basedpyright>=1.34.0",
+    "httpx>=0.28.1",
     "pytest>=9.0.1",
     "ruff>=0.14.6",
 ]

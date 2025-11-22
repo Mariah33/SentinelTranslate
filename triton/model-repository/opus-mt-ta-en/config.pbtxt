@@ -1,0 +1,17 @@
+name: "opus-mt-ta-en"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+input [
+  {
+    name: "INPUT_TEXT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+output [
+  {
+    name: "OUTPUT_TEXT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]

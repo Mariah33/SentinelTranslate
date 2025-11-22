@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Redis - Celery broker (DB 0) and backend (DB 1)
+  redis:
+    image: redis:7-alpine
+    container_name: sentineltranslate-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - sentineltranslate
+
+  # NVIDIA Triton Inference Server
+  triton:
+    image: nvcr.io/nvidia/tritonserver:24.11-py3
+    container_name: sentineltranslate-triton
+    command: tritonserver --model-repository=/models --strict-model-config=false --log-verbose=1 --model-control-mode=poll --allow-http=true --strict-readiness=false
+    ports:
+      - "8000:8000"  # HTTP
+      - "8001:8001"  # gRPC
+      - "8002:8002"  # Metrics
+    volumes:
+      - ./triton/empty-models:/models:ro  # Use empty directory until you add actual ONNX models
+      # When you have models, change to: ./triton/model-repository:/models:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/v2/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - sentineltranslate
+    # Note: Base config runs CPU-only. For GPU support, use docker-compose.gpu.yml override
+    # Note: Uses poll mode to allow dynamic model loading without requiring models at startup
+
+  # FastAPI Sidecar (single-text translation API)
+  sidecar:
+    build:
+      context: ./sidecar
+      dockerfile: Dockerfile
+    container_name: sentineltranslate-sidecar
+    ports:
+      - "8080:8080"
+    environment:
+      - REDIS_BROKER=redis://redis:6379/0
+      - REDIS_BACKEND=redis://redis:6379/1
+      - TRITON_URL=triton:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+      triton:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sentineltranslate
+    restart: unless-stopped
+
+  # FastAPI API (batch S3 parquet translation API)
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: sentineltranslate-api
+    ports:
+      - "8090:8090"
+    environment:
+      - REDIS_BROKER=redis://redis:6379/0
+      - REDIS_BACKEND=redis://redis:6379/1
+      # AWS credentials should be provided via environment or IAM role
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - sentineltranslate
+    restart: unless-stopped
+
+  # Celery Worker
+  worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    # Note: No container_name when using replicas - Docker Compose auto-generates unique names
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - TRITON_URL=triton:8000
+    depends_on:
+      redis:
+        condition: service_healthy
+      triton:
+        condition: service_healthy
+    networks:
+      - sentineltranslate
+    restart: unless-stopped
+    deploy:
+      replicas: 2  # Run 2 worker instances for parallel processing
+
+networks:
+  sentineltranslate:
+    driver: bridge
+
+volumes:
+  redis-data:

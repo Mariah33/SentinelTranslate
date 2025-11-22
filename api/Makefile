@@ -17,10 +17,10 @@ python:
 	uv run python --version
 
 install:
-	$(UV) sync
+	$(UV) sync --dev
 
 build:
-	docker build -t sidecar:latest .
+	docker build -t frontend:latest .
 
 format:
 	$(UV) run ruff check --select I --fix
@@ -28,10 +28,9 @@ format:
 
 lint: format
 	$(UV) run ruff check .
-# 	$(UV) run basedpyright .
 
 test:
 	$(UV) run pytest -q
 
 run:
-	$(UV) run uvicorn $(APP_NAME) --host 0.0.0.0 --port 8080 --reload
+	$(UV) run uvicorn $(APP_NAME) --host 0.0.0.0 --port 8090 --reload

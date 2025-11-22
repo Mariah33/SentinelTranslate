@@ -1,0 +1,49 @@
+[project]
+name = "translation-worker"
+version = "0.1.0"
+description = "Celery worker for OPUS-MT Triton translation"
+requires-python = ">=3.10"
+
+dependencies = [
+    "celery",
+    "redis",
+    "boto3",
+    "tritonclient[http]",
+    "langid",
+    "spacy",
+    "pandas",
+    "pyarrow",
+]
+
+[dependency-groups]
+dev = ["ruff","basedpyright","pytest"]
+
+[tool.ruff]
+line-length = 100
+indent-width = 4
+target-version = "py311"
+lint.select = ["E","F","I","N","UP","B","A","C4"]
+lint.ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+known-first-party = ["worker"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+reportMissingImports = false
+reportMissingTypeStubs = false
+pythonVersion = "3.11"
+include = ["."]
+exclude = ["**/__pycache__/"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.app]
+command = "celery -A celery_app worker --loglevel=INFO"

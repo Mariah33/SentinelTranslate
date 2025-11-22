@@ -1,0 +1,15 @@
+version: '3.8'
+
+# Override for GPU deployment (requires NVIDIA GPU + nvidia-docker)
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.gpu.yml up
+
+services:
+  triton:
+    # Enable GPU support for Triton
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

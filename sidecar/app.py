@@ -5,8 +5,6 @@ from fastapi import FastAPI
 from pydantic import BaseModel
 
 from client_triton import TritonClient
-from postprocessing import postprocess
-from preprocessing import preprocess
 
 app = FastAPI()
 celery_app = Celery("translator", broker="redis://redis:6379/0", backend="redis://redis:6379/1")
@@ -17,6 +15,11 @@ class Req(BaseModel):
     text: str
     source_lang: str
     target_lang: str
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 
 @app.post("/translate")

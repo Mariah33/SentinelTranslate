@@ -1,0 +1,10 @@
+version: '3.8'
+
+# Override for explicit CPU-only deployment with optimized settings
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.cpu.yml up
+# Note: Base docker-compose.yml already runs CPU-only. This override adds CPU optimizations.
+
+services:
+  triton:
+    # Add CPU-specific optimizations
+    command: tritonserver --model-repository=/models --strict-model-config=false --log-verbose=1 --backend-config=onnxruntime,default-max-batch-size=8
