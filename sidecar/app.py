@@ -2,11 +2,16 @@ from uuid import uuid4
 
 from celery import Celery
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 from client_triton import TritonClient
 
 app = FastAPI()
+
+# Initialize Prometheus metrics
+Instrumentator().instrument(app).expose(app)
+
 celery_app = Celery("translator", broker="redis://redis:6379/0", backend="redis://redis:6379/1")
 triton = TritonClient("triton:8000")
 

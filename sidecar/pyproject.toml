@@ -17,7 +17,8 @@ dependencies = [
     "redis",
     "boto3",
     "tritonclient[http]",
-    "gevent<25.0.0",  # Pin to version with pre-built wheels for macOS
+    "gevent<25.0.0", # Pin to version with pre-built wheels for macOS
+    "prometheus-fastapi-instrumentator", # Prometheus metrics instrumentation
 ]
 
 [project.optional-dependencies]

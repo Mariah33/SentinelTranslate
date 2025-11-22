@@ -1,0 +1,376 @@
+{{- if .Values.monitoring.enabled }}
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-alerts
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  groups:
+    # API Performance and Availability Alerts
+    - name: sentineltranslate.api.rules
+      interval: 30s
+      rules:
+        # High error rate for sidecar API
+        - alert: SidecarHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-sidecar",status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-sidecar"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            component: sidecar
+          annotations:
+            summary: "Sidecar API has high error rate"
+            description: "Sidecar API error rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
+
+        # Critical error rate for sidecar API
+        - alert: SidecarCriticalErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-sidecar",status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-sidecar"}[5m]))
+            ) > 0.20
+          for: 2m
+          labels:
+            severity: critical
+            component: sidecar
+          annotations:
+            summary: "Sidecar API has critical error rate"
+            description: "Sidecar API error rate is {{ printf \"%.2f\" $value }}% (threshold: 20%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
+
+        # High latency for sidecar API
+        - alert: SidecarHighLatency
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(http_request_duration_seconds_bucket{job="{{ include "sentineltranslate.fullname" . }}-sidecar"}[5m])) by (le)
+            ) > 2
+          for: 5m
+          labels:
+            severity: warning
+            component: sidecar
+          annotations:
+            summary: "Sidecar API has high latency"
+            description: "Sidecar API p95 latency is {{ printf \"%.2f\" $value }}s (threshold: 2s)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-latency.md"
+
+        # Batch API high error rate
+        - alert: BatchAPIHighErrorRate
+          expr: |
+            (
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-api",status=~"5.."}[5m]))
+              /
+              sum(rate(http_requests_total{job="{{ include "sentineltranslate.fullname" . }}-api"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            component: api
+          annotations:
+            summary: "Batch API has high error rate"
+            description: "Batch API error rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/api-high-error-rate.md"
+
+        # API pods not available
+        - alert: SidecarAPIDown
+          expr: |
+            sum(up{job="{{ include "sentineltranslate.fullname" . }}-sidecar"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: sidecar
+          annotations:
+            summary: "Sidecar API is completely down"
+            description: "No sidecar API pods are responding to health checks"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-down.md"
+
+    # Triton GPU and Inference Alerts
+    - name: sentineltranslate.triton.rules
+      interval: 30s
+      rules:
+        # GPU utilization too high
+        - alert: TritonHighGPUUtilization
+          expr: |
+            avg(nv_gpu_utilization{job="{{ include "sentineltranslate.fullname" . }}-triton"}) > 90
+          for: 10m
+          labels:
+            severity: warning
+            component: triton
+          annotations:
+            summary: "Triton GPU utilization is very high"
+            description: "Triton GPU utilization is {{ printf \"%.2f\" $value }}% (threshold: 90%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu.md"
+
+        # GPU memory utilization too high
+        - alert: TritonHighGPUMemory
+          expr: |
+            (
+              avg(nv_gpu_memory_used_bytes{job="{{ include "sentineltranslate.fullname" . }}-triton"})
+              /
+              avg(nv_gpu_memory_total_bytes{job="{{ include "sentineltranslate.fullname" . }}-triton"})
+            ) * 100 > 85
+          for: 10m
+          labels:
+            severity: warning
+            component: triton
+          annotations:
+            summary: "Triton GPU memory usage is very high"
+            description: "Triton GPU memory usage is {{ printf \"%.2f\" $value }}% (threshold: 85%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu-memory.md"
+
+        # Inference latency too high
+        - alert: TritonHighInferenceLatency
+          expr: |
+            avg(nv_inference_request_duration_us{job="{{ include "sentineltranslate.fullname" . }}-triton"}) / 1000 > 500
+          for: 5m
+          labels:
+            severity: warning
+            component: triton
+          annotations:
+            summary: "Triton inference latency is high"
+            description: "Triton average inference latency is {{ printf \"%.2f\" $value }}ms (threshold: 500ms)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-latency.md"
+
+        # Inference failures
+        - alert: TritonInferenceFailures
+          expr: |
+            sum(rate(nv_inference_request_failure{job="{{ include "sentineltranslate.fullname" . }}-triton"}[5m])) > 0.1
+          for: 5m
+          labels:
+            severity: critical
+            component: triton
+          annotations:
+            summary: "Triton is experiencing inference failures"
+            description: "Triton inference failure rate: {{ printf \"%.2f\" $value }} req/s"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-failures.md"
+
+        # Triton server down
+        - alert: TritonServerDown
+          expr: |
+            sum(up{job="{{ include "sentineltranslate.fullname" . }}-triton"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: triton
+          annotations:
+            summary: "Triton Inference Server is down"
+            description: "No Triton server pods are responding to health checks"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-down.md"
+
+        # Model not loaded
+        - alert: TritonModelNotReady
+          expr: |
+            nv_model_ready_state{job="{{ include "sentineltranslate.fullname" . }}-triton"} == 0
+          for: 5m
+          labels:
+            severity: warning
+            component: triton
+          annotations:
+            summary: "Triton model {{ $labels.model }} is not ready"
+            description: "Model {{ $labels.model }} version {{ $labels.version }} is not in ready state"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-model-not-ready.md"
+
+    # Celery Worker Alerts
+    - name: sentineltranslate.worker.rules
+      interval: 30s
+      rules:
+        # High task failure rate
+        - alert: WorkerHighTaskFailureRate
+          expr: |
+            (
+              sum(rate(celery_task_failed_total{job="{{ include "sentineltranslate.fullname" . }}-worker"}[5m]))
+              /
+              sum(rate(celery_task_total{job="{{ include "sentineltranslate.fullname" . }}-worker"}[5m]))
+            ) > 0.05
+          for: 5m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Celery workers have high task failure rate"
+            description: "Worker task failure rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-failure-rate.md"
+
+        # Queue depth too high
+        - alert: WorkerHighQueueDepth
+          expr: |
+            sum(celery_queue_length{job="{{ include "sentineltranslate.fullname" . }}-worker"}) > 1000
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Celery queue depth is very high"
+            description: "Celery queue has {{ printf \"%.0f\" $value }} pending tasks (threshold: 1000)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
+
+        # Critical queue depth
+        - alert: WorkerCriticalQueueDepth
+          expr: |
+            sum(celery_queue_length{job="{{ include "sentineltranslate.fullname" . }}-worker"}) > 5000
+          for: 5m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "Celery queue depth is critically high"
+            description: "Celery queue has {{ printf \"%.0f\" $value }} pending tasks (threshold: 5000)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
+
+        # No active workers
+        - alert: WorkerNoActiveWorkers
+          expr: |
+            sum(celery_workers_active{job="{{ include "sentineltranslate.fullname" . }}-worker"}) == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: worker
+          annotations:
+            summary: "No active Celery workers"
+            description: "All Celery workers are down or not responding"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-down.md"
+
+        # Task processing time too long
+        - alert: WorkerSlowTaskProcessing
+          expr: |
+            histogram_quantile(0.95,
+              sum(rate(celery_task_duration_seconds_bucket{job="{{ include "sentineltranslate.fullname" . }}-worker"}[5m])) by (le)
+            ) > 60
+          for: 10m
+          labels:
+            severity: warning
+            component: worker
+          annotations:
+            summary: "Celery tasks are processing slowly"
+            description: "p95 task duration is {{ printf \"%.2f\" $value }}s (threshold: 60s)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-slow-tasks.md"
+
+    # Redis Alerts
+    - name: sentineltranslate.redis.rules
+      interval: 30s
+      rules:
+        # Redis memory usage high
+        - alert: RedisHighMemoryUsage
+          expr: |
+            (
+              redis_memory_used_bytes{job="{{ .Release.Name }}-redis-metrics"}
+              /
+              redis_memory_max_bytes{job="{{ .Release.Name }}-redis-metrics"}
+            ) * 100 > 80
+          for: 10m
+          labels:
+            severity: warning
+            component: redis
+          annotations:
+            summary: "Redis memory usage is high"
+            description: "Redis memory usage is {{ printf \"%.2f\" $value }}% (threshold: 80%)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-high-memory.md"
+
+        # Redis down
+        - alert: RedisDown
+          expr: |
+            redis_up{job="{{ .Release.Name }}-redis-metrics"} == 0
+          for: 2m
+          labels:
+            severity: critical
+            component: redis
+          annotations:
+            summary: "Redis is down"
+            description: "Redis instance is not responding"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-down.md"
+
+        # Redis too many connections
+        - alert: RedisTooManyConnections
+          expr: |
+            redis_connected_clients{job="{{ .Release.Name }}-redis-metrics"} > 1000
+          for: 5m
+          labels:
+            severity: warning
+            component: redis
+          annotations:
+            summary: "Redis has too many client connections"
+            description: "Redis has {{ printf \"%.0f\" $value }} connected clients (threshold: 1000)"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-too-many-connections.md"
+
+    # Kubernetes Pod Alerts
+    - name: sentineltranslate.pods.rules
+      interval: 30s
+      rules:
+        # Pod crash looping
+        - alert: PodCrashLooping
+          expr: |
+            rate(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}",pod=~"{{ include "sentineltranslate.fullname" . }}.*"}[15m]) > 0
+          for: 5m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Pod {{ $labels.pod }} is crash looping"
+            description: "Pod {{ $labels.pod }} has restarted {{ printf \"%.2f\" $value }} times in the last 15 minutes"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-crash-loop.md"
+
+        # Pod not ready
+        - alert: PodNotReady
+          expr: |
+            kube_pod_status_phase{namespace="{{ .Release.Namespace }}",pod=~"{{ include "sentineltranslate.fullname" . }}.*",phase!~"Running|Succeeded"} > 0
+          for: 10m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Pod {{ $labels.pod }} is not ready"
+            description: "Pod {{ $labels.pod }} has been in {{ $labels.phase }} phase for more than 10 minutes"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-not-ready.md"
+
+        # Container OOM killed
+        - alert: ContainerOOMKilled
+          expr: |
+            kube_pod_container_status_last_terminated_reason{namespace="{{ .Release.Namespace }}",pod=~"{{ include "sentineltranslate.fullname" . }}.*",reason="OOMKilled"} > 0
+          for: 1m
+          labels:
+            severity: critical
+            component: kubernetes
+          annotations:
+            summary: "Container in pod {{ $labels.pod }} was OOM killed"
+            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was killed due to out of memory"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/container-oom.md"
+
+        # High CPU usage
+        - alert: PodHighCPUUsage
+          expr: |
+            sum(rate(container_cpu_usage_seconds_total{namespace="{{ .Release.Namespace }}",pod=~"{{ include "sentineltranslate.fullname" . }}.*"}[5m])) by (pod) > 0.9
+          for: 10m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Pod {{ $labels.pod }} has high CPU usage"
+            description: "Pod {{ $labels.pod }} CPU usage is {{ printf \"%.2f\" $value }} cores"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-high-cpu.md"
+
+        # High memory usage
+        - alert: PodHighMemoryUsage
+          expr: |
+            sum(container_memory_working_set_bytes{namespace="{{ .Release.Namespace }}",pod=~"{{ include "sentineltranslate.fullname" . }}.*"}) by (pod) / 1024 / 1024 / 1024 > 1.5
+          for: 10m
+          labels:
+            severity: warning
+            component: kubernetes
+          annotations:
+            summary: "Pod {{ $labels.pod }} has high memory usage"
+            description: "Pod {{ $labels.pod }} memory usage is {{ printf \"%.2f\" $value }}Gi"
+            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-high-memory.md"
+
+{{- end }}
+{{- end }}

@@ -1,0 +1,15 @@
+{{- if .Values.monitoring.enabled }}
+{{- if index .Values "kube-prometheus-stack" "grafana" "enabled" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentineltranslate-grafana-dashboards
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    grafana_dashboard: "1"
+data:
+  overview.json: |-
+{{ .Files.Get "dashboards/overview.json" | indent 4 }}
+{{- end }}
+{{- end }}

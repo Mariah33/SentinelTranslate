@@ -1,0 +1,279 @@
+# values-monitoring.yaml
+# Production monitoring configuration for SentinelTranslate
+# Use with: helm install sentineltranslate . -f values.yaml -f values-monitoring.yaml
+
+# Enable monitoring stack
+monitoring:
+  enabled: true
+
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus
+
+# Enable Redis ServiceMonitor
+redis:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: ""
+      interval: 30s
+      labels:
+        release: prometheus
+
+# Kube-Prometheus-Stack production configuration
+kube-prometheus-stack:
+  enabled: true
+
+  prometheus:
+    prometheusSpec:
+      # Production retention - 30 days
+      retention: 30d
+      retentionSize: "50GB"
+
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 60Gi
+
+      # Production resources
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+
+      # Scrape configuration
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+
+      # Service monitor selector
+      serviceMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      podMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      ruleSelector:
+        matchLabels:
+          release: prometheus
+
+      externalLabels:
+        cluster: sentineltranslate
+        environment: production
+
+      # Enable remote write to long-term storage (optional)
+      # remoteWrite:
+      #   - url: "https://prometheus-remote-write.example.com/api/v1/write"
+      #     basicAuth:
+      #       username:
+      #         name: prometheus-remote-write
+      #         key: username
+      #       password:
+      #         name: prometheus-remote-write
+      #         key: password
+
+  grafana:
+    enabled: true
+
+    # IMPORTANT: Change this password in production!
+    # Or use existingSecret
+    adminPassword: "CHANGE-ME-IN-PRODUCTION"
+
+    # Enable persistence
+    persistence:
+      enabled: true
+      storageClassName: gp3
+      size: 10Gi
+
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+
+    # Enable ingress for external access
+    ingress:
+      enabled: true
+      ingressClassName: alb
+      annotations:
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+        alb.ingress.kubernetes.io/ssl-redirect: '443'
+        # Add your ACM certificate ARN
+        # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxxx"
+        # Optional: WAF protection
+        # alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/xxxxx"
+      hosts:
+        - grafana.sentineltranslate.example.com
+      tls: []
+
+    # Install useful plugins
+    plugins:
+      - grafana-piechart-panel
+      - grafana-clock-panel
+      - grafana-polystat-panel
+
+    # Configure data sources
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: http://sentineltranslate-kube-prometheus-stack-prometheus:9090
+            access: proxy
+            isDefault: true
+            editable: false
+            jsonData:
+              timeInterval: 30s
+
+    # Dashboard providers
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: 'sentineltranslate'
+            orgId: 1
+            folder: 'SentinelTranslate'
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/sentineltranslate
+
+    dashboardsConfigMaps:
+      sentineltranslate: "sentineltranslate-grafana-dashboards"
+
+  alertmanager:
+    enabled: true
+
+    alertmanagerSpec:
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 10Gi
+
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+
+    config:
+      global:
+        resolve_timeout: 5m
+        # Add Slack, PagerDuty, or email configuration here
+        # slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 12h
+        receiver: 'default'
+        routes:
+          - match:
+              alertname: Watchdog
+            receiver: 'null'
+          - match:
+              severity: critical
+            receiver: 'critical'
+            continue: true
+          - match:
+              severity: warning
+            receiver: 'warning'
+
+      receivers:
+        - name: 'null'
+
+        - name: 'default'
+          # Configure your default notification channel
+          # slack_configs:
+          #   - channel: '#alerts'
+          #     title: 'SentinelTranslate Alert'
+          #     text: '{{ range .Alerts }}{{ .Annotations.description }}{{ end }}'
+
+        - name: 'critical'
+          # Configure critical alerts (PagerDuty, etc.)
+          # pagerduty_configs:
+          #   - service_key: 'YOUR_PAGERDUTY_KEY'
+
+        - name: 'warning'
+          # Configure warning alerts
+          # slack_configs:
+          #   - channel: '#alerts-warning'
+
+      inhibit_rules:
+        - source_match:
+            severity: 'critical'
+          target_match:
+            severity: 'warning'
+          equal: ['alertname', 'cluster', 'service']
+
+  # Enable node exporter
+  nodeExporter:
+    enabled: true
+
+  # Enable kube-state-metrics
+  kubeStateMetrics:
+    enabled: true
+
+  # Prometheus operator
+  prometheusOperator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+  # Enable default alerting rules
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: true
+      etcd: false
+      configReloaders: true
+      general: true
+      k8s: true
+      kubeApiserverAvailability: true
+      kubeApiserverSlos: true
+      kubelet: true
+      kubeProxy: false
+      kubePrometheusGeneral: true
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: true
+      kubernetesSystem: true
+      kubeScheduler: false
+      kubeStateMetrics: true
+      network: true
+      node: true
+      nodeExporterAlerting: true
+      nodeExporterRecording: true
+      prometheus: true
+      prometheusOperator: true

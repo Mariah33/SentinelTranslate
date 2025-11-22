@@ -1,0 +1,76 @@
+{{- if .Values.sidecar.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentineltranslate.sidecar.fullname" . }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sidecar
+spec:
+  {{- if not .Values.sidecar.autoscaling.enabled }}
+  replicas: {{ .Values.sidecar.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sidecar
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "sentineltranslate.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: sidecar
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sentineltranslate.sidecar.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: sidecar
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
+          imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: REDIS_BROKER
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/0"
+            - name: REDIS_BACKEND
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/1"
+            - name: TRITON_URL
+              value: "{{ include "sentineltranslate.triton.fullname" . }}:8000"
+          {{- with .Values.sidecar.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.sidecar.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.sidecar.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.sidecar.resources | nindent 12 }}
+      {{- with .Values.sidecar.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sidecar.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sidecar.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

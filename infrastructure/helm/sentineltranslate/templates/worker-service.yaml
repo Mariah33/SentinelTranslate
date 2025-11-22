@@ -1,0 +1,25 @@
+{{- if .Values.worker.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-worker
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  {{- with .Values.worker.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: ClusterIP
+  clusterIP: None  # Headless service for worker pods
+  selector:
+    {{- include "sentineltranslate.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+  ports:
+    - port: {{ .Values.monitoring.metrics.worker.port }}
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+{{- end }}

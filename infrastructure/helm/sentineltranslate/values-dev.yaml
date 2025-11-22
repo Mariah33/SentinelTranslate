@@ -1,0 +1,138 @@
+# Development environment values for SentinelTranslate
+# Override default values for local/development deployments
+
+global:
+  imagePullPolicy: IfNotPresent
+
+# Use smaller Redis for development
+redis:
+  enabled: true
+  master:
+    persistence:
+      enabled: false  # Disable persistence for faster startup
+      size: 1Gi
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "50m"
+      limits:
+        memory: "256Mi"
+        cpu: "250m"
+
+# Minimal Triton configuration for dev
+triton:
+  enabled: true
+  replicaCount: 1
+
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+      nvidia.com/gpu: 1
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+      nvidia.com/gpu: 1
+
+  # Use emptyDir for models (mount models from local)
+  persistence:
+    enabled: false
+
+# Single replica for development
+sidecar:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: sentineltranslate-sidecar
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+
+  autoscaling:
+    enabled: false
+
+api:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: sentineltranslate-api
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+
+  serviceAccount:
+    create: true
+    annotations: {}
+      # For local development, may not need IRSA
+
+  env:
+    AWS_REGION: "us-east-1"
+
+  autoscaling:
+    enabled: false
+
+worker:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: sentineltranslate-worker
+    tag: dev
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  celery:
+    concurrency: 2
+    logLevel: DEBUG
+    maxTasksPerChild: 100
+
+  serviceAccount:
+    create: true
+    annotations: {}
+
+  autoscaling:
+    enabled: false
+
+# Disable ingress for development (use port-forward instead)
+ingress:
+  enabled: false
+
+# Disable monitoring in dev
+serviceMonitor:
+  enabled: false
+
+# Relaxed security for development
+securityContext:
+  runAsNonRoot: false
+  runAsUser: 0
+  fsGroup: 0
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL

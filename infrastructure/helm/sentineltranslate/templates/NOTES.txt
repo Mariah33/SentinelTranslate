@@ -1,0 +1,159 @@
+Thank you for installing {{ .Chart.Name }}!
+
+Your release is named {{ .Release.Name }}.
+
+SentinelTranslate has been deployed with the following components:
+
+{{- if .Values.redis.enabled }}
+✓ Redis (message broker and result backend)
+{{- end }}
+{{- if .Values.triton.enabled }}
+✓ NVIDIA Triton Inference Server (ML model serving)
+{{- end }}
+{{- if .Values.sidecar.enabled }}
+✓ Sidecar API (single-text translation) - {{ .Values.sidecar.replicaCount }} replica(s)
+{{- end }}
+{{- if .Values.api.enabled }}
+✓ Batch API (parquet translation) - {{ .Values.api.replicaCount }} replica(s)
+{{- end }}
+{{- if .Values.worker.enabled }}
+✓ Celery Workers (translation processing) - {{ .Values.worker.replicaCount }} replica(s)
+{{- end }}
+
+To get the status of your deployment:
+
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+{{- if .Values.ingress.enabled }}
+
+INGRESS CONFIGURATION:
+----------------------
+{{- range .Values.ingress.hosts }}
+  {{- range .paths }}
+  {{ if eq .backend.service.name "sidecar" }}
+  Single-text translation: http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ .path }}
+  {{- else if eq .backend.service.name "api" }}
+  Batch translation:       http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}{{ .path }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+
+Note: It may take a few minutes for the LoadBalancer IP to be available.
+You can watch the status of by running:
+
+  kubectl get ingress -n {{ .Release.Namespace }} {{ include "sentineltranslate.fullname" . }} --watch
+
+{{- else }}
+
+TO ACCESS THE APIs:
+-------------------
+{{- if .Values.sidecar.enabled }}
+
+Sidecar API (single-text translation):
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "sentineltranslate.sidecar.fullname" . }} 8080:8080
+
+  Then access at: http://localhost:8080
+{{- end }}
+{{- if .Values.api.enabled }}
+
+Batch API (parquet translation):
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "sentineltranslate.api.fullname" . }} 8090:8090
+
+  Then access at: http://localhost:8090
+{{- end }}
+{{- end }}
+
+{{- if .Values.triton.enabled }}
+
+TO CHECK TRITON INFERENCE SERVER:
+----------------------------------
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "sentineltranslate.triton.fullname" . }} 8000:8000
+
+  Then check health: curl http://localhost:8000/v2/health/live
+{{- end }}
+
+MONITORING:
+-----------
+To view logs for each component:
+
+  # Sidecar API
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=sidecar --tail=100 -f
+
+  # Batch API
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=api --tail=100 -f
+
+  # Celery Workers
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=worker --tail=100 -f
+
+  # Triton Inference Server
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/component=triton --tail=100 -f
+
+  # Redis
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name=redis --tail=100 -f
+
+{{- if or .Values.api.serviceAccount.annotations .Values.worker.serviceAccount.annotations }}
+
+IRSA CONFIGURATION:
+-------------------
+{{- if .Values.api.serviceAccount.annotations }}
+Batch API service account: {{ include "sentineltranslate.api.serviceAccountName" . }}
+{{- with .Values.api.serviceAccount.annotations }}
+Annotations:
+{{- range $key, $value := . }}
+  {{ $key }}: {{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- if .Values.worker.serviceAccount.annotations }}
+Worker service account: {{ include "sentineltranslate.worker.serviceAccountName" . }}
+{{- with .Values.worker.serviceAccount.annotations }}
+Annotations:
+{{- range $key, $value := . }}
+  {{ $key }}: {{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+Make sure your IAM roles have the necessary S3 permissions.
+{{- end }}
+
+{{- if .Values.triton.enabled }}
+
+IMPORTANT - GPU NODES:
+----------------------
+Triton requires GPU nodes. Ensure your cluster has nodes with:
+  - GPU resources (nvidia.com/gpu)
+  - NVIDIA device plugin installed
+  - Appropriate node labels matching nodeSelector: {{ .Values.triton.nodeSelector }}
+
+To check GPU availability:
+  kubectl describe nodes | grep -A 10 "Allocatable:" | grep nvidia.com/gpu
+{{- end }}
+
+SCALING:
+--------
+{{- if .Values.sidecar.autoscaling.enabled }}
+✓ Sidecar API: HPA enabled ({{ .Values.sidecar.autoscaling.minReplicas }}-{{ .Values.sidecar.autoscaling.maxReplicas }} replicas)
+{{- else }}
+  Scale sidecar manually: kubectl scale -n {{ .Release.Namespace }} deployment/{{ include "sentineltranslate.sidecar.fullname" . }} --replicas=<count>
+{{- end }}
+
+{{- if .Values.api.autoscaling.enabled }}
+✓ Batch API: HPA enabled ({{ .Values.api.autoscaling.minReplicas }}-{{ .Values.api.autoscaling.maxReplicas }} replicas)
+{{- else }}
+  Scale batch API manually: kubectl scale -n {{ .Release.Namespace }} deployment/{{ include "sentineltranslate.api.fullname" . }} --replicas=<count>
+{{- end }}
+
+{{- if .Values.worker.autoscaling.enabled }}
+✓ Workers: HPA enabled ({{ .Values.worker.autoscaling.minReplicas }}-{{ .Values.worker.autoscaling.maxReplicas }} replicas)
+{{- else }}
+  Scale workers manually: kubectl scale -n {{ .Release.Namespace }} deployment/{{ include "sentineltranslate.worker.fullname" . }} --replicas=<count>
+{{- end }}
+
+For more information, see the README at:
+https://github.com/yourusername/SentinelTranslate/tree/main/infrastructure/helm/sentineltranslate
+
+Happy translating!

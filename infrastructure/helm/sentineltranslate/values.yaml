@@ -1,0 +1,672 @@
+# Default values for sentineltranslate
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+# Global settings
+global:
+  # Image pull policy for all components
+  imagePullPolicy: IfNotPresent
+  # ImagePullSecrets for private registries
+  imagePullSecrets: []
+  # - name: ecr-registry-secret
+
+# Redis dependency (bitnami/redis)
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+  master:
+    persistence:
+      enabled: true
+      size: 8Gi
+      storageClass: "gp3"
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: false  # Set to true when monitoring.enabled=true
+      namespace: ""
+      interval: 30s
+      labels:
+        release: prometheus
+
+# NVIDIA Triton Inference Server
+triton:
+  enabled: true
+  replicaCount: 1
+
+  image:
+    repository: nvcr.io/nvidia/tritonserver
+    tag: "24.11-py3"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    http:
+      port: 8000
+      targetPort: 8000
+    grpc:
+      port: 8001
+      targetPort: 8001
+    metrics:
+      port: 8002
+      targetPort: 8002
+
+  # GPU resources - required for Triton
+  resources:
+    requests:
+      memory: "4Gi"
+      cpu: "2000m"
+      nvidia.com/gpu: 1
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+      nvidia.com/gpu: 1
+
+  # Node selector for GPU nodes
+  nodeSelector:
+    accelerator: nvidia-tesla-t4
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /v2/health/live
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /v2/health/ready
+      port: 8000
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+
+  # Command and args
+  command:
+    - tritonserver
+  args:
+    - --model-repository=/models
+    - --strict-model-config=false
+    - --log-verbose=1
+    - --model-control-mode=poll
+    - --allow-http=true
+    - --strict-readiness=false
+
+  # Volume configuration for model repository
+  persistence:
+    enabled: false
+    # If enabled, create PVC for models
+    # storageClass: "gp3"
+    # size: 20Gi
+
+  # Init container to download models (optional)
+  initContainers: []
+
+# Sidecar API (FastAPI single-text translation)
+sidecar:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: sentineltranslate-sidecar
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8080
+    targetPort: 8080
+    annotations: {}
+
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "1000m"
+
+  # Environment variables
+  env:
+    REDIS_BROKER: "redis://{{ .Release.Name }}-redis-master:6379/0"
+    REDIS_BACKEND: "redis://{{ .Release.Name }}-redis-master:6379/1"
+    TRITON_URL: "{{ .Release.Name }}-triton:8000"
+
+  # Additional environment variables from secrets/configmaps
+  envFrom: []
+
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8080
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # HPA configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Batch API (FastAPI batch parquet translation)
+api:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: sentineltranslate-api
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 8090
+    targetPort: 8090
+    annotations: {}
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+  # Service account for IRSA (IAM Roles for Service Accounts)
+  serviceAccount:
+    create: true
+    annotations:
+      # eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/sentineltranslate-api-role"
+    name: ""
+
+  # Environment variables
+  env:
+    REDIS_BROKER: "redis://{{ .Release.Name }}-redis-master:6379/0"
+    REDIS_BACKEND: "redis://{{ .Release.Name }}-redis-master:6379/1"
+    AWS_REGION: "us-east-1"
+
+  # Additional environment variables from secrets/configmaps
+  envFrom: []
+
+  # Liveness and readiness probes
+  livenessProbe:
+    httpGet:
+      path: /health
+      port: 8090
+    initialDelaySeconds: 15
+    periodSeconds: 10
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: 8090
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+  # HPA configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Celery Worker
+worker:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: sentineltranslate-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+  # Headless service for worker metrics
+  service:
+    annotations: {}
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  # Service account for IRSA (S3 access)
+  serviceAccount:
+    create: true
+    annotations:
+      # eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/sentineltranslate-worker-role"
+    name: ""
+
+  # Environment variables
+  env:
+    CELERY_BROKER_URL: "redis://{{ .Release.Name }}-redis-master:6379/0"
+    CELERY_RESULT_BACKEND: "redis://{{ .Release.Name }}-redis-master:6379/1"
+    TRITON_URL: "{{ .Release.Name }}-triton:8000"
+
+  # Additional environment variables from secrets/configmaps
+  envFrom: []
+
+  # Celery worker configuration
+  celery:
+    concurrency: 4
+    logLevel: INFO
+    maxTasksPerChild: 1000
+
+  # HPA configuration
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+    # Custom metrics for queue length
+    customMetrics: []
+
+  # Pod disruption budget
+  podDisruptionBudget:
+    enabled: false
+    minAvailable: 1
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Ingress configuration
+ingress:
+  enabled: true
+  className: alb
+
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    # Certificate ARN for HTTPS
+    # alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:123456789012:certificate/xxxxx"
+    # WAF integration
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-east-1:123456789012:regional/webacl/xxxxx"
+    # Tags
+    # alb.ingress.kubernetes.io/tags: Environment=production,Team=ml
+
+  hosts:
+    - host: translate.example.com
+      paths:
+        - path: /api/v1/translate
+          pathType: Prefix
+          backend:
+            service:
+              name: sidecar
+              port: 8080
+        - path: /api/v1/batch
+          pathType: Prefix
+          backend:
+            service:
+              name: api
+              port: 8090
+
+  # TLS configuration
+  tls: []
+  # - secretName: sentineltranslate-tls
+  #   hosts:
+  #     - translate.example.com
+
+# Monitoring configuration (Prometheus + Grafana)
+monitoring:
+  enabled: false
+
+  # ServiceMonitor configuration for all components
+  serviceMonitor:
+    enabled: true
+    namespace: ""  # Leave empty to use release namespace
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus
+
+  # Metrics endpoints configuration
+  metrics:
+    # Triton metrics (already exposed on port 8002)
+    triton:
+      enabled: true
+      port: 8002
+      path: /metrics
+
+    # Sidecar API metrics (requires prometheus-fastapi-instrumentator)
+    sidecar:
+      enabled: true
+      port: 8080
+      path: /metrics
+
+    # Batch API metrics (requires prometheus-fastapi-instrumentator)
+    api:
+      enabled: true
+      port: 8090
+      path: /metrics
+
+    # Worker metrics (requires celery-prometheus-exporter sidecar)
+    worker:
+      enabled: true
+      port: 9808
+      path: /metrics
+
+    # Redis metrics (from bitnami chart)
+    redis:
+      enabled: true
+      port: 9121
+      path: /metrics
+
+# Network Policies
+networkPolicy:
+  enabled: false
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress: []
+  egress: []
+
+# Pod Security Policy
+podSecurityPolicy:
+  enabled: false
+
+# Security Context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Pod annotations (for all components)
+podAnnotations: {}
+
+# Pod labels (for all components)
+podLabels: {}
+
+# Kube-Prometheus-Stack configuration (sub-chart)
+# Only used when monitoring.enabled=true
+kube-prometheus-stack:
+  # Install Prometheus Operator and related components
+  enabled: false
+
+  # Prometheus configuration
+  prometheus:
+    enabled: true
+    prometheusSpec:
+      # Retention period for metrics
+      retention: 15d
+      retentionSize: "10GB"
+
+      # Storage configuration
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 20Gi
+
+      # Resource requests and limits
+      resources:
+        requests:
+          cpu: 500m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+
+      # Scrape interval
+      scrapeInterval: 30s
+      evaluationInterval: 30s
+
+      # Service monitor selector
+      serviceMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      # Pod monitor selector
+      podMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      # Rule selector for PrometheusRules
+      ruleSelector:
+        matchLabels:
+          release: prometheus
+
+      # External labels for federation
+      externalLabels:
+        cluster: sentineltranslate
+        environment: production
+
+  # Grafana configuration
+  grafana:
+    enabled: true
+
+    # Admin credentials (use secret in production)
+    adminPassword: "prom-operator"
+
+    # Persistence for dashboards
+    persistence:
+      enabled: true
+      storageClassName: gp3
+      size: 5Gi
+
+    # Resource requests and limits
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+
+    # Data sources configuration
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: http://{{ .Release.Name }}-kube-prometheus-stack-prometheus:9090
+            access: proxy
+            isDefault: true
+            editable: false
+
+    # Dashboard providers
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: 'sentineltranslate'
+            orgId: 1
+            folder: 'SentinelTranslate'
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/sentineltranslate
+
+    # Dashboard ConfigMaps to load
+    dashboardsConfigMaps:
+      sentineltranslate: "sentineltranslate-grafana-dashboards"
+
+    # Ingress for Grafana UI
+    ingress:
+      enabled: false
+      ingressClassName: alb
+      annotations:
+        alb.ingress.kubernetes.io/scheme: internet-facing
+        alb.ingress.kubernetes.io/target-type: ip
+        alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+      hosts:
+        - grafana.example.com
+      tls: []
+
+    # Grafana plugins
+    plugins:
+      - grafana-piechart-panel
+      - grafana-clock-panel
+
+  # Alertmanager configuration
+  alertmanager:
+    enabled: true
+
+    alertmanagerSpec:
+      # Storage for Alertmanager
+      storage:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: gp3
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 5Gi
+
+      # Resources
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+        limits:
+          cpu: 500m
+          memory: 256Mi
+
+    # Alertmanager configuration
+    config:
+      global:
+        resolve_timeout: 5m
+
+      route:
+        group_by: ['alertname', 'cluster', 'service']
+        group_wait: 10s
+        group_interval: 10s
+        repeat_interval: 12h
+        receiver: 'null'
+        routes:
+          - match:
+              alertname: Watchdog
+            receiver: 'null'
+
+      receivers:
+        - name: 'null'
+
+      inhibit_rules:
+        - source_match:
+            severity: 'critical'
+          target_match:
+            severity: 'warning'
+          equal: ['alertname', 'cluster', 'service']
+
+  # Node Exporter (for infrastructure metrics)
+  nodeExporter:
+    enabled: true
+
+  # Kube-state-metrics (for Kubernetes object metrics)
+  kubeStateMetrics:
+    enabled: true
+
+  # Prometheus Operator
+  prometheusOperator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 256Mi
+
+  # Default rules (pre-configured alerts)
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: true
+      etcd: false
+      configReloaders: true
+      general: true
+      k8s: true
+      kubeApiserverAvailability: true
+      kubeApiserverSlos: true
+      kubelet: true
+      kubeProxy: false
+      kubePrometheusGeneral: true
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: true
+      kubernetesSystem: true
+      kubeScheduler: false
+      kubeStateMetrics: true
+      network: true
+      node: true
+      nodeExporterAlerting: true
+      nodeExporterRecording: true
+      prometheus: true
+      prometheusOperator: true

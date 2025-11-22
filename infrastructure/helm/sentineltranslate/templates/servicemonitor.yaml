@@ -1,0 +1,148 @@
+{{- if .Values.monitoring.enabled }}
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+---
+# ServiceMonitor for Triton Inference Server
+{{- if .Values.triton.enabled }}
+{{- if .Values.monitoring.metrics.triton.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-triton
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: triton
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: triton
+  endpoints:
+    - port: metrics
+      path: {{ .Values.monitoring.metrics.triton.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+{{- end }}
+{{- end }}
+
+---
+# ServiceMonitor for Sidecar API
+{{- if .Values.sidecar.enabled }}
+{{- if .Values.monitoring.metrics.sidecar.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-sidecar
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sidecar
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: sidecar
+  endpoints:
+    - port: http
+      path: {{ .Values.monitoring.metrics.sidecar.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+{{- end }}
+{{- end }}
+
+---
+# ServiceMonitor for Batch API
+{{- if .Values.api.enabled }}
+{{- if .Values.monitoring.metrics.api.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-api
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api
+  endpoints:
+    - port: http
+      path: {{ .Values.monitoring.metrics.api.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+{{- end }}
+{{- end }}
+
+---
+# ServiceMonitor for Celery Worker
+{{- if .Values.worker.enabled }}
+{{- if .Values.monitoring.metrics.worker.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "sentineltranslate.fullname" . }}-worker
+  namespace: {{ .Values.monitoring.serviceMonitor.namespace | default .Release.Namespace }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+    {{- with .Values.monitoring.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  endpoints:
+    - port: metrics
+      path: {{ .Values.monitoring.metrics.worker.path }}
+      interval: {{ .Values.monitoring.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout }}
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: pod
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+{{- end }}
+{{- end }}
+
+{{- end }}
+{{- end }}

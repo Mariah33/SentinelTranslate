@@ -1,0 +1,88 @@
+{{- if .Values.triton.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentineltranslate.triton.fullname" . }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: triton
+spec:
+  replicas: {{ .Values.triton.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: triton
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "sentineltranslate.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: triton
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sentineltranslate.triton.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      {{- with .Values.triton.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: triton
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.triton.image.repository }}:{{ .Values.triton.image.tag }}"
+          imagePullPolicy: {{ .Values.triton.image.pullPolicy }}
+          command:
+            {{- toYaml .Values.triton.command | nindent 12 }}
+          args:
+            {{- toYaml .Values.triton.args | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+            - name: grpc
+              containerPort: 8001
+              protocol: TCP
+            - name: metrics
+              containerPort: 8002
+              protocol: TCP
+          livenessProbe:
+            {{- toYaml .Values.triton.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.triton.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.triton.resources | nindent 12 }}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      volumes:
+        - name: models
+          {{- if .Values.triton.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "sentineltranslate.triton.fullname" . }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      {{- with .Values.triton.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.triton.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.triton.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

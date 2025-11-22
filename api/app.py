@@ -2,9 +2,13 @@ from uuid import uuid4
 
 from celery import Celery
 from fastapi import FastAPI
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel, Field
 
 app = FastAPI(title="SentinelTranslate Batch Frontend", version="0.1.0")
+
+# Initialize Prometheus metrics
+Instrumentator().instrument(app).expose(app)
 
 # Celery configuration - connects to same broker/backend as sidecar
 celery_app = Celery("translator", broker="redis://redis:6379/0", backend="redis://redis:6379/1")

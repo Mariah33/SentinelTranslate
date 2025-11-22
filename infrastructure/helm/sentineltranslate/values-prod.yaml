@@ -1,0 +1,283 @@
+# Production environment values for SentinelTranslate
+# Override default values for production EKS deployments
+
+global:
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets:
+    - ecr-registry-secret
+
+# Production Redis with persistence and monitoring
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: true
+    password: "CHANGE_ME_IN_SECRET"  # Use Sealed Secrets or External Secrets in real deployment
+  master:
+    persistence:
+      enabled: true
+      size: 20Gi
+      storageClass: "gp3"
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "250m"
+      limits:
+        memory: "1Gi"
+        cpu: "1000m"
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+
+# Production Triton with GPU
+triton:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-triton
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "8Gi"
+      cpu: "4000m"
+      nvidia.com/gpu: 1
+    limits:
+      memory: "16Gi"
+      cpu: "8000m"
+      nvidia.com/gpu: 1
+
+  nodeSelector:
+    accelerator: nvidia-tesla-t4
+    node-type: gpu
+
+  tolerations:
+    - key: nvidia.com/gpu
+      operator: Exists
+      effect: NoSchedule
+
+  persistence:
+    enabled: true
+    storageClass: "gp3"
+    size: 50Gi
+
+# Production Sidecar with HA and autoscaling
+sidecar:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-sidecar
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "1Gi"
+      cpu: "2000m"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: sidecar
+            topologyKey: kubernetes.io/hostname
+
+# Production Batch API with IRSA
+api:
+  enabled: true
+  replicaCount: 3
+
+  image:
+    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-api
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::<ACCOUNT_ID>:role/sentineltranslate-api-role"
+
+  env:
+    AWS_REGION: "us-east-1"
+
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 70
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: api
+            topologyKey: kubernetes.io/hostname
+
+# Production Workers with IRSA and autoscaling
+worker:
+  enabled: true
+  replicaCount: 5
+
+  image:
+    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-worker
+    tag: "v1.0.0"
+    pullPolicy: IfNotPresent
+
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "4000m"
+
+  serviceAccount:
+    create: true
+    annotations:
+      eks.amazonaws.com/role-arn: "arn:aws:iam::<ACCOUNT_ID>:role/sentineltranslate-worker-role"
+
+  celery:
+    concurrency: 8
+    logLevel: INFO
+    maxTasksPerChild: 1000
+
+  autoscaling:
+    enabled: true
+    minReplicas: 5
+    maxReplicas: 50
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 3
+
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/component: worker
+            topologyKey: kubernetes.io/hostname
+
+# Production Ingress with ALB
+ingress:
+  enabled: true
+  className: alb
+
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<CERT_ID>"
+    alb.ingress.kubernetes.io/tags: "Environment=production,Team=ml,CostCenter=translation"
+    # Optional WAF
+    # alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-east-1:<ACCOUNT_ID>:regional/webacl/<WAF_ID>"
+    # Rate limiting
+    alb.ingress.kubernetes.io/load-balancer-attributes: |
+      deletion_protection.enabled=true,
+      idle_timeout.timeout_seconds=60
+
+  hosts:
+    - host: translate.example.com
+      paths:
+        - path: /api/v1/translate
+          pathType: Prefix
+          backend:
+            service:
+              name: sidecar
+              port: 8080
+        - path: /api/v1/batch
+          pathType: Prefix
+          backend:
+            service:
+              name: api
+              port: 8090
+
+  tls:
+    - secretName: sentineltranslate-tls
+      hosts:
+        - translate.example.com
+
+# Enable Prometheus monitoring
+serviceMonitor:
+  enabled: true
+  namespace: monitoring
+  interval: 30s
+  scrapeTimeout: 10s
+  labels:
+    prometheus: kube-prometheus
+
+# Network policies for security
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Production security context
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: false
+  capabilities:
+    drop:
+      - ALL
+
+# Pod annotations for monitoring
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+
+podLabels:
+  environment: production
+  team: ml

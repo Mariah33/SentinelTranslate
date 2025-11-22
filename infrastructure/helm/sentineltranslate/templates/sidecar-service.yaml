@@ -1,0 +1,23 @@
+{{- if .Values.sidecar.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentineltranslate.sidecar.fullname" . }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: sidecar
+  {{- with .Values.sidecar.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.sidecar.service.type }}
+  ports:
+    - port: {{ .Values.sidecar.service.port }}
+      targetPort: {{ .Values.sidecar.service.targetPort }}
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "sentineltranslate.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: sidecar
+{{- end }}

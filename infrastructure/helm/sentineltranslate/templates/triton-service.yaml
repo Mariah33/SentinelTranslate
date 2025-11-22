@@ -1,0 +1,27 @@
+{{- if .Values.triton.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "sentineltranslate.triton.fullname" . }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: triton
+spec:
+  type: {{ .Values.triton.service.type }}
+  ports:
+    - port: {{ .Values.triton.service.http.port }}
+      targetPort: {{ .Values.triton.service.http.targetPort }}
+      protocol: TCP
+      name: http
+    - port: {{ .Values.triton.service.grpc.port }}
+      targetPort: {{ .Values.triton.service.grpc.targetPort }}
+      protocol: TCP
+      name: grpc
+    - port: {{ .Values.triton.service.metrics.port }}
+      targetPort: {{ .Values.triton.service.metrics.targetPort }}
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "sentineltranslate.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: triton
+{{- end }}

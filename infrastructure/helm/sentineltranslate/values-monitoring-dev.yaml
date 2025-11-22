@@ -1,0 +1,174 @@
+# values-monitoring-dev.yaml
+# Development monitoring configuration for SentinelTranslate
+# Minimal resource usage for local development and testing
+# Use with: helm install sentineltranslate . -f values.yaml -f values-monitoring-dev.yaml
+
+# Enable monitoring stack
+monitoring:
+  enabled: true
+
+  serviceMonitor:
+    enabled: true
+    interval: 60s  # Longer interval to reduce load
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus
+
+# Enable Redis ServiceMonitor
+redis:
+  metrics:
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      namespace: ""
+      interval: 60s
+      labels:
+        release: prometheus
+
+# Kube-Prometheus-Stack development configuration (minimal resources)
+kube-prometheus-stack:
+  enabled: true
+
+  prometheus:
+    prometheusSpec:
+      # Short retention for dev - 7 days
+      retention: 7d
+      retentionSize: "5GB"
+
+      # No persistence in dev (use emptyDir)
+      storageSpec: {}
+
+      # Minimal resources for dev
+      resources:
+        requests:
+          cpu: 200m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+
+      # Longer scrape interval to reduce resource usage
+      scrapeInterval: 60s
+      evaluationInterval: 60s
+
+      serviceMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      podMonitorSelector:
+        matchLabels:
+          release: prometheus
+
+      ruleSelector:
+        matchLabels:
+          release: prometheus
+
+      externalLabels:
+        cluster: sentineltranslate
+        environment: development
+
+  grafana:
+    enabled: true
+
+    # Simple password for dev
+    adminPassword: "admin"
+
+    # No persistence in dev
+    persistence:
+      enabled: false
+
+    # Minimal resources
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+    # No ingress in dev - use port-forward
+    ingress:
+      enabled: false
+
+    # Minimal plugins
+    plugins:
+      - grafana-piechart-panel
+
+    datasources:
+      datasources.yaml:
+        apiVersion: 1
+        datasources:
+          - name: Prometheus
+            type: prometheus
+            url: http://sentineltranslate-kube-prometheus-stack-prometheus:9090
+            access: proxy
+            isDefault: true
+            editable: true
+            jsonData:
+              timeInterval: 60s
+
+    dashboardProviders:
+      dashboardproviders.yaml:
+        apiVersion: 1
+        providers:
+          - name: 'sentineltranslate'
+            orgId: 1
+            folder: 'SentinelTranslate'
+            type: file
+            disableDeletion: false
+            editable: true
+            options:
+              path: /var/lib/grafana/dashboards/sentineltranslate
+
+    dashboardsConfigMaps:
+      sentineltranslate: "sentineltranslate-grafana-dashboards"
+
+  alertmanager:
+    enabled: false  # Disable alertmanager in dev
+
+  # Enable node exporter
+  nodeExporter:
+    enabled: true
+
+  # Enable kube-state-metrics
+  kubeStateMetrics:
+    enabled: true
+
+  # Prometheus operator
+  prometheusOperator:
+    enabled: true
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+  # Minimal default rules
+  defaultRules:
+    create: true
+    rules:
+      alertmanager: false
+      etcd: false
+      configReloaders: false
+      general: false
+      k8s: true
+      kubeApiserverAvailability: false
+      kubeApiserverSlos: false
+      kubelet: true
+      kubeProxy: false
+      kubePrometheusGeneral: false
+      kubePrometheusNodeRecording: true
+      kubernetesApps: true
+      kubernetesResources: true
+      kubernetesStorage: false
+      kubernetesSystem: true
+      kubeScheduler: false
+      kubeStateMetrics: true
+      network: false
+      node: true
+      nodeExporterAlerting: false
+      nodeExporterRecording: true
+      prometheus: false
+      prometheusOperator: false

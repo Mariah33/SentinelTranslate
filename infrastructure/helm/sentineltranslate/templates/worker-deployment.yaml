@@ -1,0 +1,98 @@
+{{- if .Values.worker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sentineltranslate.worker.fullname" . }}
+  labels:
+    {{- include "sentineltranslate.labels" . | nindent 4 }}
+    app.kubernetes.io/component: worker
+spec:
+  {{- if not .Values.worker.autoscaling.enabled }}
+  replicas: {{ .Values.worker.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "sentineltranslate.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: worker
+  template:
+    metadata:
+      annotations:
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "sentineltranslate.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: worker
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "sentineltranslate.worker.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.securityContext | nindent 8 }}
+      containers:
+        - name: worker
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
+          env:
+            - name: CELERY_BROKER_URL
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/0"
+            - name: CELERY_RESULT_BACKEND
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/1"
+            - name: TRITON_URL
+              value: "{{ include "sentineltranslate.triton.fullname" . }}:8000"
+            - name: CELERY_CONCURRENCY
+              value: {{ .Values.worker.celery.concurrency | quote }}
+            - name: CELERY_LOG_LEVEL
+              value: {{ .Values.worker.celery.logLevel | quote }}
+            - name: CELERY_MAX_TASKS_PER_CHILD
+              value: {{ .Values.worker.celery.maxTasksPerChild | quote }}
+          {{- with .Values.worker.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+        {{- if .Values.monitoring.enabled }}
+        {{- if .Values.monitoring.metrics.worker.enabled }}
+        # Celery Prometheus Exporter sidecar
+        - name: celery-exporter
+          image: danihodovic/celery-exporter:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: metrics
+              containerPort: 9808
+              protocol: TCP
+          env:
+            - name: CELERY_BROKER_URL
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/0"
+            - name: CELERY_RESULT_BACKEND
+              value: "redis://{{ include "sentineltranslate.redis.host" . }}:{{ include "sentineltranslate.redis.port" . }}/1"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
+        {{- end }}
+        {{- end }}
+      {{- with .Values.worker.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.worker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

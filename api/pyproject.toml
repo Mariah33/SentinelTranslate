@@ -15,6 +15,7 @@ dependencies = [
     "pydantic",
     "celery",
     "redis",
+    "prometheus-fastapi-instrumentator", # Prometheus metrics instrumentation
 ]
 
 [project.optional-dependencies]
