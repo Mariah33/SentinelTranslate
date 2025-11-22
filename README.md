@@ -27,7 +27,7 @@ SentinelTranslate includes advanced safeguards to ensure accurate, faithful tran
 - Makefile-driven workflows (`make install`, `make test`, etc.)
 
 ### 🧱 Distributed Architecture
-- **FastAPI Frontend:** Batch S3 parquet translation API
+- **FastAPI Batch API:** Batch S3 parquet translation API
 - **FastAPI Sidecar:** Single-text translation API
 - **Celery Worker:** Runs decoding, safety checks, and Triton inference (handles both single-text and batch jobs)
 - **Redis:** Message broker & result backend
@@ -40,7 +40,7 @@ SentinelTranslate includes advanced safeguards to ensure accurate, faithful tran
 ```
 ┌─────────────────────────┐         ┌─────────────────────────┐
 │  Single-Text Request    │         │  Batch S3 Parquet       │
-│  (Sidecar API :8080)    │         │  (Frontend API :8090)   │
+│  (Sidecar API :8080)    │         │  (Batch API :8090)      │
 └───────────┬─────────────┘         └───────────┬─────────────┘
             │                                   │
             └──────────┬────────────────────────┘
@@ -75,11 +75,20 @@ Client polls /status/{job_id}      Client polls /batch/status/{job_id}
 ```
 sentineltranslate/
 │
-├── frontend/             # FastAPI batch translation API (S3 parquet files)
+├── api/                  # FastAPI batch translation API (S3 parquet files)
 ├── sidecar/              # FastAPI single-text translation API
 ├── worker/               # Celery worker with safety checks
 ├── triton/
 │   └── model-repository/ # All OPUS-MT ONNX models
+├── examples/             # Jupyter notebooks for 10 languages + tutorials
+│   ├── 01_french_to_english.ipynb
+│   ├── 02_spanish_to_english.ipynb
+│   ├── ... (10 language pairs total)
+│   ├── model_conversion/          # OPUS-MT to ONNX conversion guide
+│   └── batch_translation/         # S3 batch processing examples
+├── infrastructure/       # Production deployment
+│   ├── terraform/        # AWS EKS cluster infrastructure
+│   └── helm/             # Kubernetes Helm charts + monitoring
 └── docker-compose.yaml
 ```
 
@@ -115,7 +124,7 @@ make down
 ```
 
 ### Access Points
-- **Frontend API:** http://localhost:8090 (batch S3 parquet translation)
+- **Batch API:** http://localhost:8090 (batch S3 parquet translation)
 - **Sidecar API:** http://localhost:8080 (single-text translation)
 - **Triton Server:** http://localhost:8000
 - **Redis:** localhost:6379
@@ -179,7 +188,7 @@ cd worker && make run
 
 ## 🌍 API Endpoints
 
-### Frontend API - Batch S3 Parquet Translation
+### Batch API - S3 Parquet Translation
 
 **Submit batch translation job**
 ```http
@@ -271,6 +280,163 @@ triton/model-repository/opus-mt-<src>-en/1/model.onnx
 ```
 
 Pre-generated directories for 40+ languages are included.
+
+---
+
+## 📚 Examples & Tutorials
+
+The `examples/` directory contains comprehensive Jupyter notebooks demonstrating SentinelTranslate for **10 major languages**:
+
+| Language | Code | Script Family | Notebook |
+|----------|------|---------------|----------|
+| French | `fr` | Latin | `01_french_to_english.ipynb` |
+| Spanish | `es` | Latin | `02_spanish_to_english.ipynb` |
+| German | `de` | Latin | `03_german_to_english.ipynb` |
+| Italian | `it` | Latin | `04_italian_to_english.ipynb` |
+| Portuguese | `pt` | Latin | `05_portuguese_to_english.ipynb` |
+| Russian | `ru` | Cyrillic | `06_russian_to_english.ipynb` |
+| Chinese | `zh` | Logographic | `07_chinese_to_english.ipynb` |
+| Japanese | `ja` | Mixed | `08_japanese_to_english.ipynb` |
+| Arabic | `ar` | Right-to-Left | `09_arabic_to_english.ipynb` |
+| Korean | `ko` | Hangul | `10_korean_to_english.ipynb` |
+
+### Advanced Tutorials
+
+- **`model_conversion/convert_opus_to_onnx.ipynb`** - Convert OPUS-MT models to ONNX format for Triton
+- **`batch_translation/batch_s3_example.ipynb`** - Process parquet files from S3 at scale
+
+Each notebook includes:
+- Basic translation examples
+- Common phrases and vocabulary
+- Edge cases (numbers, entities, special characters)
+- Hallucination detection demonstrations
+- Performance benchmarking
+- Error handling
+
+### Getting Started with Examples
+
+```bash
+cd examples
+jupyter notebook
+
+# Open any language notebook, e.g.:
+open 01_french_to_english.ipynb
+```
+
+See [`examples/README.md`](examples/README.md) for complete documentation.
+
+---
+
+## ☁️ Production Deployment
+
+### AWS EKS Infrastructure
+
+Production-ready Terraform infrastructure for deploying to AWS EKS:
+
+```bash
+cd infrastructure/terraform
+
+# Initialize and deploy EKS cluster
+make init
+make plan
+make apply
+
+# Configure kubectl
+make kubeconfig
+```
+
+**Features:**
+- Free-tier optimized ($140-$550/month depending on configuration)
+- CPU node group (t3.medium) + GPU node group (g4dn.xlarge)
+- Auto-scaling (GPU nodes scale to 0 when idle)
+- IRSA roles for secure S3 access
+- VPC with public/private subnets
+- CloudWatch logging and monitoring
+
+See [`infrastructure/terraform/README.md`](infrastructure/terraform/README.md) for detailed deployment guide.
+
+### Kubernetes Deployment (Helm)
+
+Deploy all components to Kubernetes with auto-scaling and monitoring:
+
+```bash
+cd infrastructure/helm/sentineltranslate
+
+# Install with production configuration
+helm install sentineltranslate . -f values-prod.yaml
+
+# Or install with monitoring enabled
+helm install sentineltranslate . -f values-prod.yaml -f values-monitoring.yaml
+```
+
+**Components:**
+- Redis (persistent storage, Bitnami chart)
+- Triton Inference Server (GPU-accelerated, nvidia.com/gpu: 1)
+- Sidecar API (single-text translation)
+- Batch API (S3 parquet translation)
+- Celery Workers (2+ replicas with HPA)
+- AWS ALB Ingress (TLS/HTTPS)
+- Prometheus & Grafana (optional monitoring)
+
+**Makefile Commands:**
+```bash
+make install-prod          # Install with production settings
+make monitoring-install    # Deploy Prometheus/Grafana stack
+make port-forward-grafana  # Access Grafana dashboard
+make logs-sidecar          # View sidecar logs
+make check-metrics         # Verify Prometheus metrics
+```
+
+See [`infrastructure/helm/sentineltranslate/README.md`](infrastructure/helm/sentineltranslate/README.md) for complete Helm documentation.
+
+---
+
+## 📊 Monitoring & Observability
+
+SentinelTranslate includes comprehensive monitoring via **Prometheus & Grafana**:
+
+### Metrics Exposed
+
+- **Sidecar API** (`/metrics`): Request rate, latency, HTTP status codes
+- **Batch API** (`/metrics`): Job submissions, processing time, S3 operations
+- **Triton Server** (port 8002): GPU utilization, inference latency, throughput
+- **Celery Workers** (port 9808): Task success/failure, queue depth, processing time
+- **Redis** (port 9121): Memory usage, connections, command stats
+
+### Pre-configured Alerts
+
+**Critical:**
+- API/Server down
+- Container OOM killed
+- No active workers
+
+**Warning:**
+- High error rate (>5%)
+- High latency (p95 >2s)
+- High GPU utilization (>90%)
+- High queue depth (>1000)
+
+### Access Monitoring
+
+```bash
+cd infrastructure/helm/sentineltranslate
+
+# Deploy monitoring stack
+make monitoring-install-prod
+
+# Access Grafana dashboard
+make port-forward-grafana
+# Login at http://localhost:3000 (admin/password)
+
+# View Prometheus
+make port-forward-prometheus
+# Access at http://localhost:9090
+
+# Check active alerts
+make alerts-firing
+```
+
+See [`infrastructure/helm/sentineltranslate/MONITORING.md`](infrastructure/helm/sentineltranslate/MONITORING.md) for complete monitoring guide.
 
 ---
 
