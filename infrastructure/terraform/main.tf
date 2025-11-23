@@ -71,7 +71,7 @@ locals {
     {
       key    = "nvidia.com/gpu"
       value  = "true"
-      effect = "NoSchedule"
+      effect = "NO_SCHEDULE" # Must be uppercase per AWS EKS requirements
     }
   ]
 }
@@ -103,9 +103,6 @@ module "vpc" {
   create_flow_log_cloudwatch_iam_role  = var.enable_vpc_flow_logs
   create_flow_log_cloudwatch_log_group = var.enable_vpc_flow_logs
 
-  # VPC Endpoints for cost optimization (avoid NAT gateway charges for AWS services)
-  enable_s3_endpoint = true # Free VPC endpoint for S3
-
   # Tags required for EKS subnet discovery
   public_subnet_tags = {
     "kubernetes.io/role/elb"                                = "1"
@@ -120,6 +117,26 @@ module "vpc" {
   }
 
   tags = local.common_tags
+}
+
+# S3 VPC Gateway Endpoint
+# Free gateway endpoint to avoid NAT gateway charges for S3 traffic
+resource "aws_vpc_endpoint" "s3" {
+  vpc_id            = module.vpc.vpc_id
+  service_name      = "com.amazonaws.${var.aws_region}.s3"
+  vpc_endpoint_type = "Gateway"
+
+  route_table_ids = concat(
+    module.vpc.private_route_table_ids,
+    module.vpc.public_route_table_ids
+  )
+
+  tags = merge(
+    local.common_tags,
+    {
+      Name = "${local.name}-s3-endpoint"
+    }
+  )
 }
 
 # EKS Cluster Module
@@ -191,7 +208,7 @@ module "eks" {
     # CPU Node Group (always created)
     {
       cpu_nodes = {
-        name = "${local.name}-cpu-nodes"
+        name = "${local.name}-cpu" # Shortened to fit IAM role name_prefix limit
 
         instance_types = var.cpu_node_instance_types
         capacity_type  = var.enable_cpu_spot_instances ? "SPOT" : "ON_DEMAND"
@@ -220,7 +237,7 @@ module "eks" {
         tags = merge(
           local.common_tags,
           {
-            Name = "${local.name}-cpu-node"
+            Name = "${local.name}-cpu"
           }
         )
       }
@@ -229,7 +246,7 @@ module "eks" {
     # GPU Node Group (conditional)
     var.enable_gpu_nodes ? {
       gpu_nodes = {
-        name = "${local.name}-gpu-nodes"
+        name = "${local.name}-gpu" # Shortened to fit IAM role name_prefix limit
 
         instance_types = var.gpu_node_instance_types
         capacity_type  = var.enable_gpu_spot_instances ? "SPOT" : "ON_DEMAND"
@@ -267,7 +284,7 @@ module "eks" {
         tags = merge(
           local.common_tags,
           {
-            Name                                          = "${local.name}-gpu-node"
+            Name                                          = "${local.name}-gpu"
             "k8s.io/cluster-autoscaler/node-template/label/nvidia.com/gpu" = "true"
           }
         )
@@ -481,6 +498,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "translation_data" {
     id     = "archive-old-translations"
     status = "Enabled"
 
+    filter {} # Apply to all objects in the bucket
+
     transition {
       days          = 90
       storage_class = "STANDARD_IA"
@@ -499,6 +518,8 @@ resource "aws_s3_bucket_lifecycle_configuration" "translation_data" {
   rule {
     id     = "cleanup-incomplete-uploads"
     status = "Enabled"
+
+    filter {} # Apply to all objects in the bucket
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7

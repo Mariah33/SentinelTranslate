@@ -206,4 +206,99 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
+# Terraform
+# Local .terraform directories
+**/.terraform/*
+
+# .tfstate files - contain sensitive data
+*.tfstate
+*.tfstate.*
+
+# Crash log files
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files, which may contain sensitive data
+*.tfvars
+*.tfvars.json
+
+# Exception: Keep example files
+!terraform.tfvars.example
+!*.tfvars.example
+
+# Override files as they are usually used to override resources locally and so
+# are not checked in
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Include override files you do wish to add to version control using negation (!)
+# Example: !example_override.tf
+
+# Include tfplan files to ignore the plan output of command: terraform plan -out=tfplan
+*tfplan*
+
+# Ignore lock file (some teams commit this, but we'll ignore for now)
+.terraform.lock.hcl
+
+# Terraform provider plugins
+.terraform.tfstate.lock.info
+
+# Helm
+# Helm dependencies
+**/charts/*.tgz
+**/charts/*/charts/*.tgz
+
+# Helm values override files (may contain secrets)
+# Only ignore local and secret values files, not standard environment configs
+values-local.yaml
+values-*.local.yaml
+values-secret.yaml
+values-*secret*.yaml
+my-values.yaml
+custom-values.yaml
+
+# Helm rendered output
+**/helm/rendered-manifests/
+
+# Chart.lock files (some teams commit these)
+**/helm/*/Chart.lock
+
+# AWS & Kubernetes
+# AWS credentials
+.aws/
+aws-credentials
+credentials
+
+# Kubernetes config files (may contain cluster credentials)
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+
+# kubectl cache
+.kube/cache/
+.kube/http-cache/
+
+# AWS Session Manager plugin
+session-manager-plugin
+
+# eksctl generated files
+eksctl-*.yaml
+
+# Infrastructure secrets
+secrets.yaml
+secret.yaml
+*.secret.yaml
+
+# Local development
+.DS_Store
+*.swp
+*.swo
+*~
+
 CLAUDE.md
