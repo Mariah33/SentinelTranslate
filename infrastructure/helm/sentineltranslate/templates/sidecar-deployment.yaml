@@ -38,7 +38,7 @@ spec:
         - name: sidecar
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          image: "{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
+          image: "{{ if .Values.global.ecrRegistry }}{{ .Values.global.ecrRegistry }}/{{ end }}{{ .Values.sidecar.image.repository }}:{{ .Values.sidecar.image.tag }}"
           imagePullPolicy: {{ .Values.sidecar.image.pullPolicy }}
           ports:
             - name: http

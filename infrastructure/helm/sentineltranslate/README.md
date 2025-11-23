@@ -158,59 +158,106 @@ helm repo update
 
 ### 2. Build and Push Docker Images
 
-Build images for all components:
+**Quick Method** (Recommended - uses automated scripts):
+
+```bash
+# From project root, source AWS credentials
+source .env
+
+# Build all images and push to ECR (includes sidecar, api, worker, triton)
+./infrastructure/build-and-push.sh
+```
+
+This automated approach:
+- Builds all 4 Docker images (sidecar, api, worker, triton)
+- Auto-detects your AWS account ID from credentials
+- Creates ECR repositories if they don't exist
+- Tags and pushes all images to ECR
+- See `infrastructure/ECR_SETUP.md` for detailed setup instructions
+
+**Manual Method** (if you need more control):
 
 ```bash
 # Set your ECR repository URL
 export ECR_REGISTRY=<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com
-export IMAGE_TAG=v1.0.0
+export IMAGE_TAG=dev
 
 # Login to ECR
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
 
 # Build and push sidecar
-cd sidecar
-docker build -t $ECR_REGISTRY/sentineltranslate-sidecar:$IMAGE_TAG .
+cd sidecar && make build
+docker tag sidecar:latest $ECR_REGISTRY/sentineltranslate-sidecar:$IMAGE_TAG
 docker push $ECR_REGISTRY/sentineltranslate-sidecar:$IMAGE_TAG
 
 # Build and push batch API
-cd ../api
-docker build -t $ECR_REGISTRY/sentineltranslate-api:$IMAGE_TAG .
+cd ../api && make build
+docker tag frontend:latest $ECR_REGISTRY/sentineltranslate-api:$IMAGE_TAG
 docker push $ECR_REGISTRY/sentineltranslate-api:$IMAGE_TAG
 
 # Build and push worker
-cd ../worker
-docker build -t $ECR_REGISTRY/sentineltranslate-worker:$IMAGE_TAG .
+cd ../worker && make build
+docker tag worker:latest $ECR_REGISTRY/sentineltranslate-worker:$IMAGE_TAG
 docker push $ECR_REGISTRY/sentineltranslate-worker:$IMAGE_TAG
+
+# Build and push triton
+cd ../triton
+docker build -t sentineltranslate-triton:$IMAGE_TAG .
+docker push $ECR_REGISTRY/sentineltranslate-triton:$IMAGE_TAG
 ```
 
 ### 3. Install the Chart
 
+The Helm chart automatically detects your AWS account ID and configures ECR image URLs. No need to hardcode account IDs!
+
 #### Development (Local/Minikube)
 
+```bash
+cd infrastructure/helm/sentineltranslate
+
+# Build dependencies (Redis, Prometheus)
+make dependency-build
+
+# Install with dev values (ECR registry auto-detected from AWS credentials)
+make install-dev
+
+# Check deployment status
+make get-pods
+```
+
+Or using raw Helm commands:
 ```bash
 helm install sentineltranslate ./infrastructure/helm/sentineltranslate \
   --namespace sentineltranslate \
   --create-namespace \
-  --values ./infrastructure/helm/sentineltranslate/values-dev.yaml
+  --values ./infrastructure/helm/sentineltranslate/values-dev.yaml \
+  --set global.ecrRegistry=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com
 ```
 
 #### Production (EKS)
 
 First, update `values-prod.yaml` with your specific values:
-- ECR image repositories and tags
+- Image tags (e.g., `v1.0.0` instead of `dev`)
 - IAM role ARNs for IRSA
 - ACM certificate ARN for HTTPS
 - Ingress hostname
 - Node selectors for GPU nodes
+- Resource requests/limits for production scale
 
 Then install:
 
 ```bash
+cd infrastructure/helm/sentineltranslate
+
+# Using Makefile (ECR registry auto-detected)
+make install-prod
+
+# Or using raw Helm command
 helm install sentineltranslate ./infrastructure/helm/sentineltranslate \
   --namespace sentineltranslate \
   --create-namespace \
-  --values ./infrastructure/helm/sentineltranslate/values-prod.yaml
+  --values ./infrastructure/helm/sentineltranslate/values-prod.yaml \
+  --set global.ecrRegistry=$(aws sts get-caller-identity --query Account --output text).dkr.ecr.us-east-1.amazonaws.com
 ```
 
 ### 4. Verify Deployment
@@ -251,22 +298,53 @@ kubectl logs -n sentineltranslate -l app.kubernetes.io/component=sidecar --tail=
 
 ### Image Configuration
 
-Update image repositories and tags:
+**Automatic ECR Registry (Recommended)**:
+
+The chart automatically constructs ECR image URLs from your AWS credentials. You only need to specify the repository name:
 
 ```yaml
+global:
+  ecrRegistry: ""  # Auto-detected from AWS credentials at deployment time
+
 sidecar:
   image:
-    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-sidecar
-    tag: v1.0.0
+    repository: sentineltranslate-sidecar  # No account ID needed!
+    tag: dev
 
 api:
   image:
-    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-api
-    tag: v1.0.0
+    repository: sentineltranslate-api
+    tag: dev
 
 worker:
   image:
-    repository: <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-worker
+    repository: sentineltranslate-worker
+    tag: dev
+
+triton:
+  image:
+    repository: sentineltranslate-triton
+    tag: dev
+```
+
+When you run `make install-dev` or `make upgrade-dev`, the Makefile automatically:
+1. Runs `aws sts get-caller-identity` to get your account ID
+2. Constructs the ECR registry URL: `<account-id>.dkr.ecr.us-east-1.amazonaws.com`
+3. Passes it via `--set global.ecrRegistry=...`
+4. Templates prepend the registry URL to each image repository
+
+**Manual Override** (if needed):
+
+You can also hardcode the full ECR URLs if you prefer:
+
+```yaml
+global:
+  ecrRegistry: "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com"
+
+# Or override per-component:
+sidecar:
+  image:
+    repository: "<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/sentineltranslate-sidecar"
     tag: v1.0.0
 ```
 
@@ -718,8 +796,8 @@ redis:
 ## Support
 
 For issues and questions:
-- GitHub Issues: https://github.com/yourusername/SentinelTranslate/issues
-- Documentation: https://github.com/yourusername/SentinelTranslate
+- GitHub Issues: https://github.com/Mariah33/SentinelTranslate/issues
+- Documentation: https://github.com/Mariah33/SentinelTranslate
 
 ## License
 

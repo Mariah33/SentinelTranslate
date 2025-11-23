@@ -10,6 +10,10 @@ global:
   imagePullSecrets: []
   # - name: ecr-registry-secret
 
+  # ECR registry URL (override with --set at deployment)
+  # Example: 123456789012.dkr.ecr.us-east-1.amazonaws.com
+  ecrRegistry: ""
+
 # Redis dependency (bitnami/redis)
 redis:
   enabled: true

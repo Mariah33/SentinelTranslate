@@ -11,16 +11,16 @@ keywords:
   - fastapi
   - ml-inference
 maintainers:
-  - name: SentinelTranslate Team
-    email: team@example.com
+  - name: Mariah33
+    email: mariah33@gmail.com
 sources:
-  - https://github.com/yourusername/SentinelTranslate
+  - https://github.com/mariah33/SentinelTranslate
 dependencies:
   - name: redis
     version: "18.x.x"
     repository: "https://charts.bitnami.com/bitnami"
     condition: redis.enabled
   - name: kube-prometheus-stack
-    version: "67.6.1"
+    version: "79.7.1"
     repository: "https://prometheus-community.github.io/helm-charts"
     condition: monitoring.enabled

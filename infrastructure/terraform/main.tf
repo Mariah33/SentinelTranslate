@@ -149,6 +149,9 @@ module "eks" {
   cluster_name    = "${local.name}-eks"
   cluster_version = var.cluster_version
 
+  # Enable cluster creator admin permissions
+  enable_cluster_creator_admin_permissions = true
+
   # Cluster endpoint access
   cluster_endpoint_public_access       = var.cluster_endpoint_public_access
   cluster_endpoint_private_access      = var.cluster_endpoint_private_access

@@ -40,7 +40,7 @@ spec:
         - name: triton
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          image: "{{ .Values.triton.image.repository }}:{{ .Values.triton.image.tag }}"
+          image: "{{ if .Values.global.ecrRegistry }}{{ .Values.global.ecrRegistry }}/{{ end }}{{ .Values.triton.image.repository }}:{{ .Values.triton.image.tag }}"
           imagePullPolicy: {{ .Values.triton.image.pullPolicy }}
           command:
             {{- toYaml .Values.triton.command | nindent 12 }}

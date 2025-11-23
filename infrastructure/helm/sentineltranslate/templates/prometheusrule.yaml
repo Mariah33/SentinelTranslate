@@ -30,8 +30,8 @@ spec:
             component: sidecar
           annotations:
             summary: "Sidecar API has high error rate"
-            description: "Sidecar API error rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
+            description: "Sidecar API error rate is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 5%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
 
         # Critical error rate for sidecar API
         - alert: SidecarCriticalErrorRate
@@ -47,8 +47,8 @@ spec:
             component: sidecar
           annotations:
             summary: "Sidecar API has critical error rate"
-            description: "Sidecar API error rate is {{ printf \"%.2f\" $value }}% (threshold: 20%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
+            description: "Sidecar API error rate is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 20%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-error-rate.md"
 
         # High latency for sidecar API
         - alert: SidecarHighLatency
@@ -62,8 +62,8 @@ spec:
             component: sidecar
           annotations:
             summary: "Sidecar API has high latency"
-            description: "Sidecar API p95 latency is {{ printf \"%.2f\" $value }}s (threshold: 2s)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-latency.md"
+            description: "Sidecar API p95 latency is {{`{{`}} printf "%.2f" $value {{`}}`}}s (threshold: 2s)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/sidecar-high-latency.md"
 
         # Batch API high error rate
         - alert: BatchAPIHighErrorRate
@@ -79,8 +79,8 @@ spec:
             component: api
           annotations:
             summary: "Batch API has high error rate"
-            description: "Batch API error rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/api-high-error-rate.md"
+            description: "Batch API error rate is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 5%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/api-high-error-rate.md"
 
         # API pods not available
         - alert: SidecarAPIDown
@@ -93,7 +93,7 @@ spec:
           annotations:
             summary: "Sidecar API is completely down"
             description: "No sidecar API pods are responding to health checks"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/sidecar-down.md"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/sidecar-down.md"
 
     # Triton GPU and Inference Alerts
     - name: sentineltranslate.triton.rules
@@ -109,8 +109,8 @@ spec:
             component: triton
           annotations:
             summary: "Triton GPU utilization is very high"
-            description: "Triton GPU utilization is {{ printf \"%.2f\" $value }}% (threshold: 90%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu.md"
+            description: "Triton GPU utilization is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 90%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu.md"
 
         # GPU memory utilization too high
         - alert: TritonHighGPUMemory
@@ -126,8 +126,8 @@ spec:
             component: triton
           annotations:
             summary: "Triton GPU memory usage is very high"
-            description: "Triton GPU memory usage is {{ printf \"%.2f\" $value }}% (threshold: 85%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu-memory.md"
+            description: "Triton GPU memory usage is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 85%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-high-gpu-memory.md"
 
         # Inference latency too high
         - alert: TritonHighInferenceLatency
@@ -139,8 +139,8 @@ spec:
             component: triton
           annotations:
             summary: "Triton inference latency is high"
-            description: "Triton average inference latency is {{ printf \"%.2f\" $value }}ms (threshold: 500ms)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-high-latency.md"
+            description: "Triton average inference latency is {{`{{`}} printf "%.2f" $value {{`}}`}}ms (threshold: 500ms)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-high-latency.md"
 
         # Inference failures
         - alert: TritonInferenceFailures
@@ -152,8 +152,8 @@ spec:
             component: triton
           annotations:
             summary: "Triton is experiencing inference failures"
-            description: "Triton inference failure rate: {{ printf \"%.2f\" $value }} req/s"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-failures.md"
+            description: "Triton inference failure rate: {{`{{`}} printf "%.2f" $value {{`}}`}} req/s"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-failures.md"
 
         # Triton server down
         - alert: TritonServerDown
@@ -166,7 +166,7 @@ spec:
           annotations:
             summary: "Triton Inference Server is down"
             description: "No Triton server pods are responding to health checks"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-down.md"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-down.md"
 
         # Model not loaded
         - alert: TritonModelNotReady
@@ -177,9 +177,9 @@ spec:
             severity: warning
             component: triton
           annotations:
-            summary: "Triton model {{ $labels.model }} is not ready"
-            description: "Model {{ $labels.model }} version {{ $labels.version }} is not in ready state"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/triton-model-not-ready.md"
+            summary: "Triton model {{`{{`}} $labels.model {{`}}`}} is not ready"
+            description: "Model {{`{{`}} $labels.model {{`}}`}} version {{`{{`}} $labels.version {{`}}`}} is not in ready state"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/triton-model-not-ready.md"
 
     # Celery Worker Alerts
     - name: sentineltranslate.worker.rules
@@ -199,8 +199,8 @@ spec:
             component: worker
           annotations:
             summary: "Celery workers have high task failure rate"
-            description: "Worker task failure rate is {{ printf \"%.2f\" $value }}% (threshold: 5%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-failure-rate.md"
+            description: "Worker task failure rate is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 5%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/worker-high-failure-rate.md"
 
         # Queue depth too high
         - alert: WorkerHighQueueDepth
@@ -212,8 +212,8 @@ spec:
             component: worker
           annotations:
             summary: "Celery queue depth is very high"
-            description: "Celery queue has {{ printf \"%.0f\" $value }} pending tasks (threshold: 1000)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
+            description: "Celery queue has {{`{{`}} printf "%.0f" $value {{`}}`}} pending tasks (threshold: 1000)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
 
         # Critical queue depth
         - alert: WorkerCriticalQueueDepth
@@ -225,8 +225,8 @@ spec:
             component: worker
           annotations:
             summary: "Celery queue depth is critically high"
-            description: "Celery queue has {{ printf \"%.0f\" $value }} pending tasks (threshold: 5000)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
+            description: "Celery queue has {{`{{`}} printf "%.0f" $value {{`}}`}} pending tasks (threshold: 5000)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/worker-high-queue.md"
 
         # No active workers
         - alert: WorkerNoActiveWorkers
@@ -239,7 +239,7 @@ spec:
           annotations:
             summary: "No active Celery workers"
             description: "All Celery workers are down or not responding"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-down.md"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/worker-down.md"
 
         # Task processing time too long
         - alert: WorkerSlowTaskProcessing
@@ -253,8 +253,8 @@ spec:
             component: worker
           annotations:
             summary: "Celery tasks are processing slowly"
-            description: "p95 task duration is {{ printf \"%.2f\" $value }}s (threshold: 60s)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/worker-slow-tasks.md"
+            description: "p95 task duration is {{`{{`}} printf "%.2f" $value {{`}}`}}s (threshold: 60s)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/worker-slow-tasks.md"
 
     # Redis Alerts
     - name: sentineltranslate.redis.rules
@@ -274,8 +274,8 @@ spec:
             component: redis
           annotations:
             summary: "Redis memory usage is high"
-            description: "Redis memory usage is {{ printf \"%.2f\" $value }}% (threshold: 80%)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-high-memory.md"
+            description: "Redis memory usage is {{`{{`}} printf "%.2f" $value {{`}}`}}% (threshold: 80%)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/redis-high-memory.md"
 
         # Redis down
         - alert: RedisDown
@@ -288,7 +288,7 @@ spec:
           annotations:
             summary: "Redis is down"
             description: "Redis instance is not responding"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-down.md"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/redis-down.md"
 
         # Redis too many connections
         - alert: RedisTooManyConnections
@@ -300,8 +300,8 @@ spec:
             component: redis
           annotations:
             summary: "Redis has too many client connections"
-            description: "Redis has {{ printf \"%.0f\" $value }} connected clients (threshold: 1000)"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/redis-too-many-connections.md"
+            description: "Redis has {{`{{`}} printf "%.0f" $value {{`}}`}} connected clients (threshold: 1000)"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/redis-too-many-connections.md"
 
     # Kubernetes Pod Alerts
     - name: sentineltranslate.pods.rules
@@ -316,9 +316,9 @@ spec:
             severity: warning
             component: kubernetes
           annotations:
-            summary: "Pod {{ $labels.pod }} is crash looping"
-            description: "Pod {{ $labels.pod }} has restarted {{ printf \"%.2f\" $value }} times in the last 15 minutes"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-crash-loop.md"
+            summary: "Pod {{`{{`}} $labels.pod {{`}}`}} is crash looping"
+            description: "Pod {{`{{`}} $labels.pod {{`}}`}} has restarted {{`{{`}} printf "%.2f" $value {{`}}`}} times in the last 15 minutes"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/pod-crash-loop.md"
 
         # Pod not ready
         - alert: PodNotReady
@@ -329,9 +329,9 @@ spec:
             severity: warning
             component: kubernetes
           annotations:
-            summary: "Pod {{ $labels.pod }} is not ready"
-            description: "Pod {{ $labels.pod }} has been in {{ $labels.phase }} phase for more than 10 minutes"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-not-ready.md"
+            summary: "Pod {{`{{`}} $labels.pod {{`}}`}} is not ready"
+            description: "Pod {{`{{`}} $labels.pod {{`}}`}} has been in {{`{{`}} $labels.phase {{`}}`}} phase for more than 10 minutes"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/pod-not-ready.md"
 
         # Container OOM killed
         - alert: ContainerOOMKilled
@@ -342,9 +342,9 @@ spec:
             severity: critical
             component: kubernetes
           annotations:
-            summary: "Container in pod {{ $labels.pod }} was OOM killed"
-            description: "Container {{ $labels.container }} in pod {{ $labels.pod }} was killed due to out of memory"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/container-oom.md"
+            summary: "Container in pod {{`{{`}} $labels.pod {{`}}`}} was OOM killed"
+            description: "Container {{`{{`}} $labels.container {{`}}`}} in pod {{`{{`}} $labels.pod {{`}}`}} was killed due to out of memory"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/container-oom.md"
 
         # High CPU usage
         - alert: PodHighCPUUsage
@@ -355,9 +355,9 @@ spec:
             severity: warning
             component: kubernetes
           annotations:
-            summary: "Pod {{ $labels.pod }} has high CPU usage"
-            description: "Pod {{ $labels.pod }} CPU usage is {{ printf \"%.2f\" $value }} cores"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-high-cpu.md"
+            summary: "Pod {{`{{`}} $labels.pod {{`}}`}} has high CPU usage"
+            description: "Pod {{`{{`}} $labels.pod {{`}}`}} CPU usage is {{`{{`}} printf "%.2f" $value {{`}}`}} cores"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/pod-high-cpu.md"
 
         # High memory usage
         - alert: PodHighMemoryUsage
@@ -368,9 +368,9 @@ spec:
             severity: warning
             component: kubernetes
           annotations:
-            summary: "Pod {{ $labels.pod }} has high memory usage"
-            description: "Pod {{ $labels.pod }} memory usage is {{ printf \"%.2f\" $value }}Gi"
-            runbook_url: "https://github.com/yourusername/SentinelTranslate/blob/main/docs/runbooks/pod-high-memory.md"
+            summary: "Pod {{`{{`}} $labels.pod {{`}}`}} has high memory usage"
+            description: "Pod {{`{{`}} $labels.pod {{`}}`}} memory usage is {{`{{`}} printf "%.2f" $value {{`}}`}}Gi"
+            runbook_url: "https://github.com/Mariah33/SentinelTranslate/blob/main/docs/runbooks/pod-high-memory.md"
 
 {{- end }}
 {{- end }}

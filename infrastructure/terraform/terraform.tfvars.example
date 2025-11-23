@@ -2,44 +2,44 @@
 # Copy this file to terraform.tfvars and customize values
 
 # Core Configuration
-project_name = "sentineltranslate"
+project_name = "sentinel" # Shortened to fit IAM role name_prefix limit (38 chars)
 environment  = "dev"
 aws_region   = "us-east-1" # us-east-1 has best free tier coverage
 
 # Network Configuration
 vpc_cidr           = "10.0.0.0/16"
-availability_zones = ["us-east-1a"] # Single AZ for cost optimization; use multiple for production HA
+availability_zones = ["us-east-1a", "us-east-1b"] # EKS requires minimum 2 AZs
 
 # Cost Optimization: NAT Gateway
 enable_nat_gateway = true  # Required for EKS private subnets
 single_nat_gateway = true  # Use one NAT gateway for all AZs (saves ~$32/month per additional gateway)
 
 # EKS Cluster Configuration
-cluster_version                      = "1.28"
+cluster_version                      = "1.32" # Latest stable version (1.31 is EOL)
 cluster_endpoint_public_access       = true  # Set to false for production (use VPN/bastion)
 cluster_endpoint_private_access      = true
 cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"] # Restrict to your IP in production
 
-# CPU Node Group (API, sidecar, worker, Redis)
+# CPU Node Group (API, worker, Redis)
 cpu_node_instance_types    = ["t3.medium"]     # 2 vCPU, 4GB RAM - minimum for k8s workloads
-cpu_node_desired_size      = 2                 # Start with 2 nodes for HA
+cpu_node_desired_size      = 1                 # Start with 1 node for cost savings
 cpu_node_min_size          = 1                 # Allow scaling down to 1 to save costs
 cpu_node_max_size          = 4                 # Allow scaling up to 4 for burst traffic
 cpu_node_disk_size         = 50                # 50GB gp3 volume per node
 enable_cpu_spot_instances  = false             # Enable for non-production to save 70% on compute
 
 # GPU Node Group (Triton Inference Server)
-enable_gpu_nodes           = true              # Set to false to completely disable GPU nodes
+enable_gpu_nodes           = false             # Disabled: Spot limit exceeded, enable after requesting limit increase
 gpu_node_instance_types    = ["g4dn.xlarge"]   # 1x NVIDIA T4 GPU, 4 vCPU, 16GB RAM
-gpu_node_desired_size      = 1                 # Start with 1 GPU node
+gpu_node_desired_size      = 0                 # Start with 0 (disabled)
 gpu_node_min_size          = 0                 # Allow scaling to 0 when idle (saves ~$380/month)
 gpu_node_max_size          = 2                 # Allow scaling up to 2 for high load
 gpu_node_disk_size         = 100               # 100GB for ONNX models
-enable_gpu_spot_instances  = false             # Set to true for 70% savings (may be interrupted)
+enable_gpu_spot_instances  = false             # Disabled: Use on-demand when GPU re-enabled
 
 # Storage Configuration
 enable_ebs_csi_driver = true  # Required for Redis persistent volumes
-enable_efs_csi_driver = false # Optional, not needed for base deployment
+enable_efs_csi_driver = false # Disabled: Not needed and requires additional IAM permissions
 
 # S3 Configuration
 create_s3_bucket      = true  # Create S3 bucket for translation workloads
@@ -67,8 +67,8 @@ enable_secrets_encryption = false # Enable KMS encryption of k8s secrets (produc
 enable_vpc_flow_logs      = false # Enable VPC flow logs (security auditing, additional costs)
 
 # Service Account Names
-worker_service_account_name = "sentineltranslate-worker"
-api_service_account_name    = "sentineltranslate-api"
+worker_service_account_name = "sentinel-worker"
+api_service_account_name    = "sentinel-api"
 
 # Additional Tags
 tags = {
@@ -82,33 +82,35 @@ tags = {
 # Cost Optimization Scenarios
 # ==========================================
 
-# Scenario 1: Minimal Cost (Development)
-# - Single AZ deployment
+# Scenario 1: Minimal Cost (Development) - DEFAULT CONFIGURATION
+# - Dual AZ deployment (EKS requirement)
 # - 1 CPU node (t3.medium)
-# - 0 GPU nodes initially
-# - Estimated: ~$105/month
+# - 0 GPU nodes (disabled)
+# - Single NAT gateway shared across AZs
+# - Estimated: ~$142/month
 #
 # cpu_node_desired_size = 1
 # cpu_node_min_size = 1
-# gpu_node_desired_size = 0
-# enable_gpu_spot_instances = true
+# enable_gpu_nodes = false
+# single_nat_gateway = true
 
 # Scenario 2: Testing with GPU (8 hours/day)
+# - Dual AZ deployment
 # - 2 CPU nodes for HA
 # - 1 GPU node, scaled to 0 after hours
-# - Estimated: ~$175/month
+# - Estimated: ~$236/month
 #
 # cpu_node_desired_size = 2
+# enable_gpu_nodes = true
 # gpu_node_desired_size = 1
 # gpu_node_min_size = 0
 
 # Scenario 3: Production (24/7)
-# - Multiple AZs for HA
+# - Dual AZ with dual NAT gateways
 # - 2 CPU nodes minimum
 # - 1 GPU node on-demand
 # - Estimated: ~$550/month
 #
-# availability_zones = ["us-east-1a", "us-east-1b"]
 # single_nat_gateway = false
 # cpu_node_min_size = 2
 # gpu_node_min_size = 1

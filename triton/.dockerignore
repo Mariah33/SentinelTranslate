@@ -1,0 +1,6 @@
+# Ignore unnecessary files during Docker build
+README.md
+*.md
+.git
+.gitignore
+empty-models/

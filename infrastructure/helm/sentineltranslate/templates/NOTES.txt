@@ -154,6 +154,6 @@ SCALING:
 {{- end }}
 
 For more information, see the README at:
-https://github.com/yourusername/SentinelTranslate/tree/main/infrastructure/helm/sentineltranslate
+https://github.com/Mariah33/SentinelTranslate/tree/main/infrastructure/helm/sentineltranslate
 
 Happy translating!

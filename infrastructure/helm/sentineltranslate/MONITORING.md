@@ -699,6 +699,6 @@ kube-prometheus-stack:
 ## Support
 
 For issues or questions:
-- GitHub Issues: https://github.com/yourusername/SentinelTranslate/issues
+- GitHub Issues: https://github.com/Mariah33/SentinelTranslate/issues
 - Runbooks: `/docs/runbooks/`
 - Slack: #sentineltranslate-ops

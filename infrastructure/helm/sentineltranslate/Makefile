@@ -1,8 +1,18 @@
 .PHONY: help lint template install upgrade uninstall test dependency-update package
 
+# Use Helm 3 due to Helm 4.0.0 bug with Chart.yaml detection
+HELM := /opt/homebrew/opt/helm@3/bin/helm
+
+# Chart path - use sentineltranslate when running from parent dir to avoid Helm bug
+# where having a directory with the same name as the chart causes "Chart.yaml missing" error
+CHART_PATH := sentineltranslate
 CHART_NAME := sentineltranslate
 NAMESPACE := sentineltranslate
 RELEASE_NAME := sentineltranslate
+
+# ECR configuration - dynamically get from AWS credentials
+AWS_REGION ?= us-east-1
+ECR_REGISTRY := $(shell aws sts get-caller-identity --query Account --output text 2>/dev/null).dkr.ecr.$(AWS_REGION).amazonaws.com
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -10,72 +20,80 @@ help: ## Show this help message
 	@echo 'Available targets:'
 	@awk 'BEGIN {FS = ":.*?## "} /^[a-zA-Z_-]+:.*?## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
-dependency-update: ## Update chart dependencies (Redis)
-	helm repo add bitnami https://charts.bitnami.com/bitnami
-	helm repo update
-	helm dependency update
+dependency-update: ## Update chart dependencies (Redis, Prometheus)
+	cd .. && $(HELM) repo add bitnami https://charts.bitnami.com/bitnami
+	cd .. && $(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	cd .. && $(HELM) repo update
+	cd .. && $(HELM) dependency update $(CHART_PATH)
+
+dependency-build: ## Build chart dependencies from Chart.lock
+	cd .. && $(HELM) dependency build $(CHART_PATH)
 
 lint: ## Lint the Helm chart
-	helm lint .
+	cd .. && $(HELM) lint $(CHART_PATH)
 
 template: ## Generate Kubernetes manifests from chart
-	helm template $(RELEASE_NAME) . \
+	cd .. && $(HELM) template $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values.yaml
+		--values $(CHART_PATH)/values.yaml
 
 template-dev: ## Generate manifests with dev values
-	helm template $(RELEASE_NAME) . \
+	cd .. && $(HELM) template $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values-dev.yaml
+		--values $(CHART_PATH)/values-dev.yaml \
+		--set global.ecrRegistry=$(ECR_REGISTRY)
 
 template-prod: ## Generate manifests with prod values
-	helm template $(RELEASE_NAME) . \
+	cd .. && $(HELM) template $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values-prod.yaml
+		--values $(CHART_PATH)/values-prod.yaml
 
 dry-run-dev: ## Dry-run install with dev values
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values-dev.yaml \
+		--values $(CHART_PATH)/values-dev.yaml \
+		--set global.ecrRegistry=$(ECR_REGISTRY) \
 		--dry-run \
 		--debug
 
 dry-run-prod: ## Dry-run install with prod values
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values-prod.yaml \
+		--values $(CHART_PATH)/values-prod.yaml \
 		--dry-run \
 		--debug
 
 install-dev: dependency-update ## Install chart with dev values
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values-dev.yaml
+		--values $(CHART_PATH)/values-dev.yaml \
+		--set global.ecrRegistry=$(ECR_REGISTRY)
 
 install-prod: dependency-update ## Install chart with prod values
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values-prod.yaml
+		--values $(CHART_PATH)/values-prod.yaml
 
 upgrade-dev: ## Upgrade chart with dev values
-	helm upgrade $(RELEASE_NAME) . \
+	cd .. && $(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values-dev.yaml
+		--values $(CHART_PATH)/values-dev.yaml \
+		--set global.ecrRegistry=$(ECR_REGISTRY)
 
 upgrade-prod: ## Upgrade chart with prod values
-	helm upgrade $(RELEASE_NAME) . \
+	cd .. && $(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values-prod.yaml
+		--values $(CHART_PATH)/values-prod.yaml
 
 uninstall: ## Uninstall the chart
-	helm uninstall $(RELEASE_NAME) --namespace $(NAMESPACE)
+	$(HELM) uninstall $(RELEASE_NAME) --namespace $(NAMESPACE)
 
 status: ## Show release status
-	helm status $(RELEASE_NAME) --namespace $(NAMESPACE)
+	$(HELM) status $(RELEASE_NAME) --namespace $(NAMESPACE)
 
 get-pods: ## Get all pods
 	kubectl get pods -n $(NAMESPACE) -l app.kubernetes.io/instance=$(RELEASE_NAME)
@@ -102,7 +120,7 @@ port-forward-triton: ## Port-forward Triton to localhost:8000
 	kubectl port-forward -n $(NAMESPACE) svc/$(RELEASE_NAME)-triton 8000:8000
 
 package: dependency-update ## Package the chart
-	helm package .
+	cd .. && $(HELM) package $(CHART_PATH)
 
 test: lint template ## Run all tests (lint + template)
 	@echo "Chart validation passed!"
@@ -113,37 +131,37 @@ clean: ## Clean generated files
 
 # Monitoring targets
 monitoring-install-dev: dependency-update ## Install with development monitoring
-	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-	helm repo update
-	helm dependency update
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	cd .. && $(HELM) repo update
+	cd .. && $(HELM) dependency update $(CHART_PATH)
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values.yaml \
-		--values values-monitoring-dev.yaml
+		--values $(CHART_PATH)/values.yaml \
+		--values $(CHART_PATH)/values-monitoring-dev.yaml
 
 monitoring-install-prod: dependency-update ## Install with production monitoring
-	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-	helm repo update
-	helm dependency update
-	helm install $(RELEASE_NAME) . \
+	cd .. && $(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	cd .. && $(HELM) repo update
+	cd .. && $(HELM) dependency update $(CHART_PATH)
+	cd .. && $(HELM) install $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
 		--create-namespace \
-		--values values.yaml \
-		--values values-monitoring.yaml \
+		--values $(CHART_PATH)/values.yaml \
+		--values $(CHART_PATH)/values-monitoring.yaml \
 		--set kube-prometheus-stack.grafana.adminPassword='$(GRAFANA_PASSWORD)'
 
 monitoring-upgrade-dev: ## Upgrade with development monitoring
-	helm upgrade $(RELEASE_NAME) . \
+	cd .. && $(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values.yaml \
-		--values values-monitoring-dev.yaml
+		--values $(CHART_PATH)/values.yaml \
+		--values $(CHART_PATH)/values-monitoring-dev.yaml
 
 monitoring-upgrade-prod: ## Upgrade with production monitoring
-	helm upgrade $(RELEASE_NAME) . \
+	cd .. && $(HELM) upgrade $(RELEASE_NAME) $(CHART_PATH) \
 		--namespace $(NAMESPACE) \
-		--values values.yaml \
-		--values values-monitoring.yaml
+		--values $(CHART_PATH)/values.yaml \
+		--values $(CHART_PATH)/values-monitoring.yaml
 
 grafana-password: ## Get Grafana admin password
 	@kubectl get secret -n $(NAMESPACE) \

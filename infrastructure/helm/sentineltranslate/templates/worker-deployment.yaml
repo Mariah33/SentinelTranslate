@@ -38,7 +38,7 @@ spec:
         - name: worker
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          image: "{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
+          image: "{{ if .Values.global.ecrRegistry }}{{ .Values.global.ecrRegistry }}/{{ end }}{{ .Values.worker.image.repository }}:{{ .Values.worker.image.tag }}"
           imagePullPolicy: {{ .Values.worker.image.pullPolicy }}
           env:
             - name: CELERY_BROKER_URL

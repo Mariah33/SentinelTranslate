@@ -38,7 +38,7 @@ spec:
         - name: api
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
-          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          image: "{{ if .Values.global.ecrRegistry }}{{ .Values.global.ecrRegistry }}/{{ end }}{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           ports:
             - name: http

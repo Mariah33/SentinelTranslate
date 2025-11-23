@@ -3,10 +3,20 @@
 
 global:
   imagePullPolicy: IfNotPresent
+  # ECR registry will be set dynamically at deployment time via Makefile
+  # Format: <account-id>.dkr.ecr.<region>.amazonaws.com
+  ecrRegistry: "SET_AT_DEPLOYMENT"
 
 # Use smaller Redis for development
 redis:
   enabled: true
+
+  # Use AWS Public ECR to avoid Docker Hub rate limiting
+  image:
+    registry: public.ecr.aws
+    repository: bitnami/redis
+    tag: 7.2.4-debian-12-r9
+
   master:
     persistence:
       enabled: false  # Disable persistence for faster startup
@@ -19,10 +29,23 @@ redis:
         memory: "256Mi"
         cpu: "250m"
 
+  metrics:
+    enabled: true
+    image:
+      registry: public.ecr.aws
+      repository: bitnami/redis-exporter
+      tag: 1.58.0-debian-12-r4
+
 # Minimal Triton configuration for dev
 triton:
   enabled: true
   replicaCount: 1
+
+  # Use ECR image with embedded models
+  image:
+    repository: sentineltranslate-triton
+    tag: dev
+    pullPolicy: IfNotPresent
 
   resources:
     requests:
