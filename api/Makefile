@@ -20,7 +20,7 @@ install:
 	$(UV) sync --dev
 
 build:
-	docker build -t frontend:latest .
+	docker build --platform linux/amd64 -t frontend:latest .
 
 format:
 	$(UV) run ruff check --select I --fix

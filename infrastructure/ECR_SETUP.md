@@ -78,6 +78,8 @@ source ~/.zshrc  # or source ~/.bashrc
 
 ## Step 3: Build and Push Images
 
+**Important**: All images are built for `linux/amd64` architecture to match AWS EKS nodes, even if you're building on Apple Silicon (ARM64). This is handled automatically by the build scripts.
+
 ### Quick Method: All-in-One
 
 Build all images and push to ECR in one command:
@@ -91,7 +93,7 @@ source .env
 ```
 
 This will:
-1. Build `sidecar`, `worker`, `api`, and `triton` images
+1. Build `sidecar`, `worker`, `api`, and `triton` images for **linux/amd64**
 2. Create ECR repositories if needed
 3. Tag images for ECR
 4. Push to ECR

@@ -1,5 +1,4 @@
 from collections import Counter
-from typing import Any
 
 from worker.language_id import validate_language
 from worker.nercheck import ner_consistency
@@ -7,7 +6,7 @@ from worker.numcheck import number_consistency
 
 
 def repetition_score(tokens: list[str], n: int = 3) -> int:
-    ngrams: list[tuple[Any, ...]] = [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
+    ngrams: list[tuple[str, ...]] = [tuple(tokens[i : i + n]) for i in range(len(tokens) - n + 1)]
     return max(Counter(ngrams).values()) if ngrams else 0
 
 
@@ -32,6 +31,6 @@ def detect_hallucination(src: str, tgt: str, src_lang: str) -> bool:
         return True
     if not number_consistency(src, tgt):
         return True
-    if not ner_consistency(src, tgt):
+    if not ner_consistency(src, tgt, src_lang):
         return True
     return False

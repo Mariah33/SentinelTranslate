@@ -2,7 +2,7 @@
 # Override default values for local/development deployments
 
 global:
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Always
   # ECR registry will be set dynamically at deployment time via Makefile
   # Format: <account-id>.dkr.ecr.<region>.amazonaws.com
   ecrRegistry: "SET_AT_DEPLOYMENT"
@@ -36,26 +36,32 @@ redis:
       repository: bitnami/redis-exporter
       tag: 1.58.0-debian-12-r4
 
-# Minimal Triton configuration for dev
+# Disable Triton for CPU-only dev environment
+# (Triton requires GPU which isn't available on t3.medium nodes)
 triton:
-  enabled: true
+  enabled: false
   replicaCount: 1
 
   # Use ECR image with embedded models
   image:
     repository: sentineltranslate-triton
     tag: dev
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
+  # CPU-only resources for dev environment (no GPU)
   resources:
     requests:
       memory: "2Gi"
       cpu: "1000m"
-      nvidia.com/gpu: 1
     limits:
       memory: "4Gi"
       cpu: "2000m"
-      nvidia.com/gpu: 1
+
+  # Disable GPU node selector for CPU-only dev environment
+  nodeSelector: null
+
+  # Disable GPU tolerations for dev
+  tolerations: []
 
   # Use emptyDir for models (mount models from local)
   persistence:
@@ -69,7 +75,7 @@ sidecar:
   image:
     repository: sentineltranslate-sidecar
     tag: dev
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   resources:
     requests:
@@ -89,7 +95,7 @@ api:
   image:
     repository: sentineltranslate-api
     tag: dev
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   resources:
     requests:
@@ -117,7 +123,7 @@ worker:
   image:
     repository: sentineltranslate-worker
     tag: dev
-    pullPolicy: IfNotPresent
+    pullPolicy: Always
 
   resources:
     requests:

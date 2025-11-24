@@ -63,7 +63,7 @@ echo ""
 
 # Build triton
 echo "Building triton..."
-cd triton && docker build -t sentineltranslate-triton:dev . && cd ..
+cd triton && docker build --platform linux/amd64 -t sentineltranslate-triton:dev . && cd ..
 echo -e "${GREEN}✓${NC} sentineltranslate-triton:dev built"
 echo ""
 

@@ -20,7 +20,7 @@ install:
 	$(UV) sync
 
 build:
-	docker build -t sidecar:latest .
+	docker build --platform linux/amd64 -t sidecar:latest .
 
 format:
 	$(UV) run ruff check --select I --fix
