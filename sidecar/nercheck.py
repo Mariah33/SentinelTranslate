@@ -155,8 +155,7 @@ def get_fallback_mode() -> FallbackMode:
         return FallbackMode(mode_str)
     except ValueError:
         logger.warning(
-            f"Invalid NER_FALLBACK_MODE '{mode_str}', defaulting to MULTILINGUAL. "
-            + "Valid values: multilingual, skip_source, strict"
+            f"Invalid NER_FALLBACK_MODE '{mode_str}', defaulting to MULTILINGUAL. " + "Valid values: multilingual, skip_source, strict"
         )
         return FallbackMode.MULTILINGUAL
 
@@ -219,16 +218,11 @@ def ner_consistency(src: str, tgt: str, src_lang: str) -> bool:
 
     # Handle missing source model based on fallback mode
     if src_lang not in SUPPORTED_LANGS and fallback_mode == FallbackMode.STRICT:
-        logger.error(
-            f"STRICT mode: Source language '{src_lang}' not supported. "
-            + f"Supported languages: {sorted(SUPPORTED_LANGS)}"
-        )
+        logger.error(f"STRICT mode: Source language '{src_lang}' not supported. " + f"Supported languages: {sorted(SUPPORTED_LANGS)}")
         return False
 
     if src_lang not in SUPPORTED_LANGS and fallback_mode == FallbackMode.SKIP_SOURCE:
-        logger.warning(
-            f"SKIP_SOURCE mode: Skipping NER check for unsupported source language '{src_lang}'"
-        )
+        logger.warning(f"SKIP_SOURCE mode: Skipping NER check for unsupported source language '{src_lang}'")
         return True
 
     # Extract target entities (always English)
@@ -237,8 +231,7 @@ def ner_consistency(src: str, tgt: str, src_lang: str) -> bool:
     # Rule 1: If source has entities but target doesn't, entities were lost
     if ents_src and not ents_tgt:
         logger.warning(
-            f"NER consistency failure: Source has {len(ents_src)} entities "
-            + f"but target has none. Source entities: {ents_src}"
+            f"NER consistency failure: Source has {len(ents_src)} entities " + f"but target has none. Source entities: {ents_src}"
         )
         return False
 
@@ -246,8 +239,7 @@ def ner_consistency(src: str, tgt: str, src_lang: str) -> bool:
     fabricated = ents_tgt - ents_src
     if fabricated:
         logger.warning(
-            f"NER consistency failure: Target has {len(fabricated)} fabricated entities "
-            + f"not present in source: {fabricated}"
+            f"NER consistency failure: Target has {len(fabricated)} fabricated entities " + f"not present in source: {fabricated}"
         )
         return False
 

@@ -1,22 +1,26 @@
-from uuid import uuid4
+import os
 
-from celery import Celery
 from fastapi import FastAPI
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 
 from client_triton import TritonClient
+from hallucination import detect_hallucination
+from postprocessing import postprocess
+from preprocessing import preprocess
 
 app = FastAPI()
 
 # Initialize Prometheus metrics
 Instrumentator().instrument(app).expose(app)
 
-celery_app = Celery("translator", broker="redis://redis:6379/0", backend="redis://redis:6379/1")
-triton = TritonClient("triton:8000")
+# Use environment variables for configuration (with fallback for local dev)
+TRITON_URL = os.environ.get("TRITON_URL", "triton:8000")
+
+triton = TritonClient(TRITON_URL)
 
 
-class Req(BaseModel):
+class TranslateReq(BaseModel):
     text: str
     source_lang: str
     target_lang: str
@@ -28,13 +32,26 @@ def health():
 
 
 @app.post("/translate")
-def translate(req: Req):
-    job_id = str(uuid4())
-    celery_app.send_task("tasks.translate", args=[job_id, req.text, req.source_lang, req.target_lang])
-    return {"job_id": job_id}
+def translate(req: TranslateReq):
+    """Synchronous translation - returns result immediately via Triton with hallucination detection"""
+    # Preprocess: split into sentences
+    sentences = preprocess(req.text)
+    outputs = []
+    model = f"opus-mt-{req.source_lang}-{req.target_lang}"
 
+    # Translate each sentence with hallucination detection
+    for sentence in sentences:
+        translated = triton.forward(model, sentence)
 
-@app.get("/status/{job_id}")
-def status(job_id: str):
-    r = celery_app.AsyncResult(job_id)
-    return {"status": r.status, "result": r.result}
+        # Check for hallucination
+        if detect_hallucination(sentence, translated, src_lang=req.source_lang):
+            # Fallback: truncate to 30 tokens and retry
+            cleaned = " ".join(sentence.split()[:30])
+            translated = triton.forward(model, cleaned)
+
+        outputs.append(translated)
+
+    # Postprocess and join sentences
+    result = postprocess(" ".join(outputs))
+
+    return {"translation": result}

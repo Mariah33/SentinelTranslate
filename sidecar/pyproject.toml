@@ -1,7 +1,7 @@
 [project]
 name = "translation-sidecar"
 version = "0.1.0"
-description = "FastAPI sidecar for OPUS-MT Triton translation using Celery"
+description = "FastAPI gateway for OPUS-MT Triton translation with hallucination detection"
 requires-python = ">=3.10"
 
 classifiers = [
@@ -13,12 +13,11 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "pydantic",
-    "celery",
-    "redis",
-    "boto3",
     "tritonclient[http]",
-    "gevent<25.0.0", # Pin to version with pre-built wheels for macOS
     "prometheus-fastapi-instrumentator", # Prometheus metrics instrumentation
+    "langid", # Language detection for hallucination checks
+    "spacy", # NER for hallucination checks
+    "nltk", # Sentence tokenization
 ]
 
 [project.optional-dependencies]

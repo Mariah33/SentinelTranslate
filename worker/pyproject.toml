@@ -8,9 +8,7 @@ dependencies = [
     "celery",
     "redis",
     "boto3",
-    "tritonclient[http]",
-    "langid",
-    "spacy",
+    "httpx",  # HTTP client for calling sidecar API
     "pandas",
     "pyarrow",
 ]

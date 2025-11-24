@@ -1,8 +1,8 @@
 from collections import Counter
 
-from worker.language_id import validate_language
-from worker.nercheck import ner_consistency
-from worker.numcheck import number_consistency
+from language_id import validate_language
+from nercheck import ner_consistency
+from numcheck import number_consistency
 
 
 def repetition_score(tokens: list[str], n: int = 3) -> int:

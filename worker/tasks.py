@@ -1,36 +1,20 @@
 import io
 import logging
+import os
 
 import boto3
+import httpx
 import pandas as pd
 
 from celery_app import celery_app
-from worker.client_triton import TritonClient
-from worker.hallucination import detect_hallucination
-from worker.postprocess import postprocess
-from worker.preprocess import preprocess
+from worker.cache import get_cached_translation, set_cached_translation
 
-triton = TritonClient("triton:8000")
+# Sidecar HTTP client configuration
+SIDECAR_URL = os.environ.get("SIDECAR_URL", "http://sidecar:8080")
+http_client = httpx.Client(base_url=SIDECAR_URL, timeout=30.0)
+
 s3_client = boto3.client("s3")
 logger = logging.getLogger(__name__)
-
-
-@celery_app.task(name="tasks.translate")
-def translate(job_id, text, src, tgt):
-    sentences = preprocess(text)
-    outputs = []
-    model = f"opus-mt-{src}-en"
-
-    for s in sentences:
-        fast = triton.forward(model, s)
-        if detect_hallucination(s, fast, src_lang=src):
-            cleaned = " ".join(s.split()[:30])
-            retry = triton.forward(model, cleaned)
-            outputs.append(retry)
-        else:
-            outputs.append(fast)
-
-    return postprocess(outputs)
 
 
 @celery_app.task(name="tasks.translate_parquet_batch", bind=True)
@@ -89,7 +73,6 @@ def translate_parquet_batch(
         logger.info(f"[{job_id}] Translating {len(df)} rows...")
         translations = []
         failed_rows = []
-        model = f"opus-mt-{source_lang}-{target_lang}"
 
         for idx, row in df.iterrows():
             try:
@@ -111,21 +94,22 @@ def translate_parquet_batch(
                     translations.append("")
                     continue
 
-                # Preprocess and translate
-                sentences = preprocess(text)
-                outputs = []
+                # Check cache first (cache key includes full text before preprocessing)
+                cached = get_cached_translation(text, source_lang, target_lang)
+                if cached:
+                    translations.append(cached)
+                    continue
 
-                for s in sentences:
-                    fast = triton.forward(model, s)
-                    if detect_hallucination(s, fast, src_lang=source_lang):
-                        # Fallback: truncate to 30 tokens and retry
-                        cleaned = " ".join(s.split()[:30])
-                        retry = triton.forward(model, cleaned)
-                        outputs.append(retry)
-                    else:
-                        outputs.append(fast)
+                # Call sidecar API for translation (handles hallucination detection internally)
+                response = http_client.post(
+                    "/translate",
+                    json={"text": text, "source_lang": source_lang, "target_lang": target_lang},
+                )
+                response.raise_for_status()
+                translated_text = response.json()["translation"]
 
-                translated_text = postprocess(outputs)
+                # Store in cache for future reuse
+                set_cached_translation(text, source_lang, target_lang, translated_text)
                 translations.append(translated_text)
 
             except Exception as e:
