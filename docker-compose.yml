@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Redis - Celery broker (DB 0) and backend (DB 1)
+  # Redis - Celery broker (DB 0), backend (DB 1), cache (DB 2)
   redis:
     image: redis:7-alpine
     container_name: sentineltranslate-redis
@@ -40,21 +40,20 @@ services:
     # Note: Base config runs CPU-only. For GPU support, use docker-compose.gpu.yml override
     # Note: Uses poll mode to allow dynamic model loading without requiring models at startup
 
-  # FastAPI Sidecar (single-text translation API)
+  # FastAPI Sidecar (synchronous translation gateway)
+  # Talks directly to Triton, handles hallucination detection
   sidecar:
     build:
       context: ./sidecar
       dockerfile: Dockerfile
+      args:
+        - MODEL_SET=dev  # Use dev models for local testing (6 languages)
     container_name: sentineltranslate-sidecar
     ports:
       - "8080:8080"
     environment:
-      - REDIS_BROKER=redis://redis:6379/0
-      - REDIS_BACKEND=redis://redis:6379/1
       - TRITON_URL=triton:8000
     depends_on:
-      redis:
-        condition: service_healthy
       triton:
         condition: service_healthy
     healthcheck:
@@ -93,7 +92,8 @@ services:
       - sentineltranslate
     restart: unless-stopped
 
-  # Celery Worker
+  # Celery Worker (batch processing orchestrator)
+  # Calls sidecar API for translations, caches results in Redis
   worker:
     build:
       context: ./worker
@@ -102,11 +102,15 @@ services:
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - TRITON_URL=triton:8000
+      - SIDECAR_URL=http://sidecar:8080
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_CACHE_DB=2
+      - CACHE_TTL=86400  # 24 hours
     depends_on:
       redis:
         condition: service_healthy
-      triton:
+      sidecar:
         condition: service_healthy
     networks:
       - sentineltranslate
