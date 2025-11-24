@@ -6,8 +6,8 @@ import boto3
 import httpx
 import pandas as pd
 
-from celery_app import celery_app
 from cache import get_cached_translation, set_cached_translation
+from celery_app import celery_app
 
 # Sidecar HTTP client configuration
 SIDECAR_URL = os.environ.get("SIDECAR_URL", "http://sidecar:8080")
