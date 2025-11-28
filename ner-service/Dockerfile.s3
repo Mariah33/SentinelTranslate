@@ -1,7 +1,8 @@
-# Multi-stage build: UV builder + UBI runtime
-# New architecture: Models are volume-mounted, not baked into container
+# Multi-stage build for volume-mounted models: UV builder + UBI runtime
+# New architecture: Models are volume-mounted, not downloaded or baked into container
 # This results in a ~200MB container image with no models included
-#
+# Models must be downloaded separately using download_all_models.py and mounted at runtime
+
 # Stage 1: UV builder for fast dependency installation
 FROM ghcr.io/astral-sh/uv:python3.11-bookworm-slim AS builder
 
@@ -19,7 +20,7 @@ FROM registry.access.redhat.com/ubi9/python-311:latest
 
 WORKDIR /app
 
-# Copy virtual environment from builder
+# Copy virtual environment from builder stage
 COPY --from=builder /app/.venv /app/.venv
 
 # Create mount points for volume-mounted models

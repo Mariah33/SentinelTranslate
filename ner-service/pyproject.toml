@@ -8,6 +8,8 @@ dependencies = [
     "fastapi",
     "uvicorn[standard]",
     "spacy>=3.8.0",
+    "stanza>=1.8.0",
+    "boto3>=1.34.0",
 ]
 
 [dependency-groups]

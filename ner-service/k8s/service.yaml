@@ -1,0 +1,99 @@
+---
+# ClusterIP Service for internal cluster communication
+# Exposes NER service within the cluster
+apiVersion: v1
+kind: Service
+metadata:
+  name: ner-service
+  namespace: sentineltranslate
+  labels:
+    app: ner-service
+    version: "1.0"
+spec:
+  type: ClusterIP
+  selector:
+    app: ner-service
+  ports:
+    - name: http
+      port: 8081        # Service port
+      targetPort: 8081  # Container port
+      protocol: TCP
+  # Session affinity (optional - for stateful requests)
+  sessionAffinity: None
+
+---
+# Optional: LoadBalancer Service for external access
+# Uncomment if you need external access to NER service
+# apiVersion: v1
+# kind: Service
+# metadata:
+#   name: ner-service-external
+#   namespace: sentineltranslate
+#   labels:
+#     app: ner-service
+#     type: external
+# spec:
+#   type: LoadBalancer
+#   selector:
+#     app: ner-service
+#   ports:
+#     - name: http
+#       port: 80
+#       targetPort: 8081
+#       protocol: TCP
+#   # Specify loadBalancerIP if your cloud provider supports it
+#   # loadBalancerIP: "x.x.x.x"
+
+---
+# Optional: NetworkPolicy to restrict traffic
+# Uncomment if your cluster has network policies enabled
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: ner-service-netpol
+#   namespace: sentineltranslate
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: ner-service
+#   policyTypes:
+#     - Ingress
+#     - Egress
+#   ingress:
+#     # Allow from sidecar service
+#     - from:
+#         - namespaceSelector:
+#             matchLabels:
+#               name: sentineltranslate
+#         - podSelector:
+#             matchLabels:
+#               app: sidecar
+#       ports:
+#         - protocol: TCP
+#           port: 8081
+#   egress:
+#     # Allow DNS
+#     - to:
+#         - namespaceSelector: {}
+#       ports:
+#         - protocol: UDP
+#           port: 53
+
+---
+# ServiceMonitor for Prometheus monitoring (optional)
+# Uncomment if Prometheus is installed in your cluster
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: ner-service
+#   namespace: sentineltranslate
+#   labels:
+#     app: ner-service
+# spec:
+#   selector:
+#     matchLabels:
+#       app: ner-service
+#   endpoints:
+#     - port: http
+#       interval: 30s
+#       path: /metrics

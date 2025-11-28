@@ -1,0 +1,59 @@
+---
+# PersistentVolumeClaim for NER service models
+# Stores 21 spaCy models (~3.5GB) + 60+ Stanza models (~4-5GB) = ~10GB total
+#
+# Prerequisites:
+#  - StorageClass must exist (standard, fast, etc.)
+#  - Namespace "sentineltranslate" must exist or be created
+#
+# Usage:
+#   kubectl apply -f k8s/pvc.yaml
+#   kubectl apply -f k8s/deployment.yaml
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ner-models-pvc
+  namespace: sentineltranslate
+  labels:
+    app: ner-service
+    component: models
+    version: "1.0"
+spec:
+  accessModes:
+    # ReadOnlyMany allows multiple pods to read the same models
+    # This is safe since models are not modified at runtime
+    - ReadOnlyMany
+  storageClassName: standard  # Adjust for your cluster (fast, ssd, gp2, etc.)
+  resources:
+    requests:
+      # ~10GB for all models + 2GB buffer for extraction = 12GB
+      # Adjust based on your cluster's storage
+      storage: 12Gi
+
+---
+# Optional: PersistentVolume if using local storage (NFS, local SSD, etc.)
+# Uncomment and adjust if your cluster doesn't use dynamic provisioning
+# apiVersion: v1
+# kind: PersistentVolume
+# metadata:
+#   name: ner-models-pv
+#   labels:
+#     app: ner-service
+# spec:
+#   capacity:
+#     storage: 12Gi
+#   accessModes:
+#     - ReadOnlyMany
+#   # Example: Local NFS storage
+#   # nfs:
+#   #   server: nfs.example.com
+#   #   path: "/models/ner"
+#   # Example: Local file storage
+#   # hostPath:
+#   #   path: /mnt/ner-models
+#   #   type: Directory
+#   storageClassName: standard
+#   claimRef:
+#     name: ner-models-pvc
+#     namespace: sentineltranslate
