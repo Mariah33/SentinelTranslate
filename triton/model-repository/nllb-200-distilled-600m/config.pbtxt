@@ -1,0 +1,23 @@
+name: "nllb-200-distilled-600m"
+platform: "onnxruntime_onnx"
+max_batch_size: 8
+
+# Simple config mirroring OPUS-MT structure
+# For more advanced use cases with separate language inputs,
+# consider using Python backend instead of onnxruntime_onnx
+
+input [
+  {
+    name: "INPUT_TEXT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]
+
+output [
+  {
+    name: "OUTPUT_TEXT"
+    data_type: TYPE_STRING
+    dims: [ -1 ]
+  }
+]

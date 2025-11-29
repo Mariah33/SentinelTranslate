@@ -1,6 +1,23 @@
 # Triton Model Repository
 
-This directory contains the NVIDIA Triton Inference Server model repository for OPUS-MT translation models.
+This directory contains the NVIDIA Triton Inference Server model repository for translation models:
+- **OPUS-MT**: 41 language pairs → English (specialized models, ~300MB each)
+- **NLLB-200**: 200+ languages any-to-any (unified model, ~1.2GB)
+
+## Quick Start
+
+Download models using the provided Makefile:
+
+```bash
+# Install dependencies
+make install
+
+# Download OPUS-MT models (41 models, ~12GB, 30-60 min)
+make download-opus
+
+# Download NLLB-200 model (~1.2GB, 10-15 min)
+make download-nllb
+```
 
 ## Structure
 
@@ -29,54 +46,56 @@ The repository is configured for 41 language pairs, all translating to English:
 
 ## Adding Models
 
-### Option 1: Download Pre-converted ONNX Models
+### Recommended: Automated Scripts (Easiest)
 
-If you have ONNX versions of OPUS-MT models:
-
-```bash
-# Example: Add French-to-English model
-mkdir -p opus-mt-fr-en/1
-cp /path/to/opus-mt-fr-en.onnx opus-mt-fr-en/1/model.onnx
-```
-
-### Option 2: Convert from HuggingFace
-
-Convert PyTorch models to ONNX format:
+Use the provided scripts to download and convert models automatically:
 
 ```bash
 # Install dependencies
-pip install transformers onnx optimum[exporters]
+make install
 
-# Convert model (example for French)
-python -m optimum.exporters.onnx \
-  --model Helsinki-NLP/opus-mt-fr-en \
-  --task text2text-generation \
-  opus-mt-fr-en/1/
+# Download all OPUS-MT models (41 models, ~12GB)
+make download-opus
 
-# Rename to expected filename
-mv opus-mt-fr-en/1/model.onnx opus-mt-fr-en/1/model.onnx
+# Download NLLB-200 model (~1.2GB)
+make download-nllb
 ```
 
-### Option 3: Bulk Conversion Script
+The scripts handle:
+- ✅ Downloading models from Hugging Face
+- ✅ Converting PyTorch models to ONNX format
+- ✅ Placing files in correct Triton directory structure
+- ✅ Error handling and progress reporting
 
-```python
-# convert_models.py
+### Manual: Convert Individual Models
+
+If you want to convert specific models manually:
+
+```bash
+# Install dependencies
+uv sync
+
+# Convert a single OPUS-MT model (e.g., French)
+uv run python -c "
 from optimum.exporters.onnx import main_export
 from pathlib import Path
 
-LANGUAGES = ["fr", "de", "es", "it", "pt", "ru", "ja", "zh"]
+model = 'Helsinki-NLP/opus-mt-fr-en'
+output = Path('model-repository/opus-mt-fr-en/1')
+output.mkdir(parents=True, exist_ok=True)
 
-for lang in LANGUAGES:
-    model_name = f"opus-mt-{lang}-en"
-    output_dir = Path(f"model-repository/{model_name}/1")
-    output_dir.mkdir(parents=True, exist_ok=True)
+main_export(model, output=output, task='text2text-generation')
+"
+```
 
-    print(f"Converting {model_name}...")
-    main_export(
-        f"Helsinki-NLP/{model_name}",
-        output=output_dir,
-        task="text2text-generation"
-    )
+### Pre-converted ONNX Models
+
+If you already have ONNX models:
+
+```bash
+# Example: Add French-to-English model
+mkdir -p model-repository/opus-mt-fr-en/1
+cp /path/to/model.onnx model-repository/opus-mt-fr-en/1/model.onnx
 ```
 
 ## Model Configuration
@@ -137,3 +156,58 @@ curl -X POST http://localhost:8000/v2/models/opus-mt-fr-en/infer \
 2. **Batch processing**: Group sentences for better throughput
 3. **Model quantization**: Reduce model size with INT8/FP16
 4. **Dynamic batching**: Enable in `config.pbtxt` for automatic batching
+## Dependencies
+
+The model download scripts require:
+- Python 3.10+
+- UV package manager
+- ~15GB disk space (for all OPUS-MT models + NLLB)
+- Internet connection for downloading from Hugging Face
+
+Installed automatically via `make install`:
+- optimum 1.27.0 (ONNX export)
+- transformers 4.53.3 (model loading)
+- torch 2.2.2 (PyTorch backend)
+- numpy 1.26.4 (array operations)
+- onnx 1.15+ (ONNX format support)
+- sentencepiece 0.1.99+ (tokenization)
+
+## Troubleshooting
+
+### Import Error: optimum.exporters.onnx
+
+**Error**: `ModuleNotFoundError: No module named 'optimum.exporters.onnx'`
+
+**Solution**: Ensure you're using optimum 1.x (not 2.x):
+```bash
+make install  # Installs pinned compatible versions
+```
+
+### NumPy Version Conflict
+
+**Error**: `A module that was compiled using NumPy 1.x cannot be run in NumPy 2.x`
+
+**Solution**: Dependencies are pinned to numpy<2.0 in pyproject.toml. Run:
+```bash
+uv sync  # Reinstalls with correct numpy version
+```
+
+### Out of Memory
+
+**Error**: Download crashes or system becomes unresponsive
+
+**Solution**: Models are downloaded sequentially to avoid memory issues. If problems persist:
+- Download models one at a time manually
+- Use `download-nllb` instead of `download-opus` (single 1.2GB vs 12GB total)
+- Increase system swap space
+
+### Connection Timeout
+
+**Error**: `HTTPError` or `Connection refused` from Hugging Face
+
+**Solution**:
+```bash
+# Retry with increased timeout
+export HF_HUB_DOWNLOAD_TIMEOUT=300
+make download-opus
+```

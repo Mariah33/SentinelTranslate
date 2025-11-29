@@ -1,0 +1,23 @@
+[project]
+name = "triton-model-downloader"
+version = "0.1.0"
+description = "Download and convert OPUS-MT and NLLB models to ONNX for Triton"
+requires-python = ">=3.10"
+
+dependencies = [
+    "optimum[exporters,onnxruntime]>=1.21.0,<2.0.0",  # ONNX export functionality (v1.x has exporters)
+    "transformers>=4.45.0,<4.54.0",  # Model loading and conversion (compatible with optimum 1.x)
+    "torch>=2.1.0,<2.3.0",  # PyTorch for model handling (compatible with optimum 1.27)
+    "numpy>=1.20.0,<2.0.0",  # NumPy 1.x for torch 2.2.2 compatibility
+    "onnx>=1.15.0",  # ONNX format support
+    "sentencepiece>=0.1.99",  # Tokenizer for OPUS-MT/NLLB
+    "protobuf>=3.20.0",  # Required by ONNX
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B"]
+ignore = ["E501"]
