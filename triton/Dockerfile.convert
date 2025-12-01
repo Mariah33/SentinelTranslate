@@ -1,0 +1,183 @@
+# Multi-stage Dockerfile for secure OPUS-MT ONNX conversion
+# Stage 1: Model converter (isolated, with internet access)
+# Stage 2: Model validator (verifies ONNX integrity)
+# Stage 3: Triton production server (no PyTorch, no vulnerabilities)
+
+# ============================================================================
+# STAGE 1: MODEL CONVERTER
+# ============================================================================
+FROM python:3.11-slim AS converter
+
+LABEL maintainer="SentinelTranslate Team"
+LABEL stage="converter"
+LABEL description="Converts OPUS-MT PyTorch models to ONNX format"
+
+WORKDIR /workspace
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python conversion tools
+# Pin versions for reproducibility
+RUN pip install --no-cache-dir \
+    transformers==4.36.2 \
+    optimum[onnxruntime]==1.16.2 \
+    onnx==1.15.0 \
+    onnxruntime==1.16.3 \
+    sentencepiece==0.1.99 \
+    protobuf==4.25.1 \
+    huggingface-hub==0.20.2
+
+# Copy conversion scripts
+COPY convert_opus_to_onnx.py .
+COPY triton_config_generator.py .
+
+# Convert models based on build argument
+# Usage: docker build --build-arg LANGUAGES="fr,de,es" -f Dockerfile.convert .
+ARG LANGUAGES="fr,de,es,it,pt,nl,pl,ro"
+ARG WORKERS=4
+ARG VALIDATE=true
+
+# Run conversion (this is the time-intensive step - 30-60 minutes for 8 languages)
+RUN echo "Converting languages: ${LANGUAGES}" && \
+    python convert_opus_to_onnx.py \
+        --languages "${LANGUAGES}" \
+        --output-dir /models \
+        --workers "${WORKERS}" \
+        $([ "${VALIDATE}" = "true" ] && echo "--validate" || echo "") && \
+    echo "Conversion complete!"
+
+# Generate Triton config files for all converted models
+RUN python triton_config_generator.py \
+        --model-dir /models \
+        --backend onnxruntime \
+        --max-batch-size 8 && \
+    echo "Generated Triton config.pbtxt files"
+
+# ============================================================================
+# STAGE 2: MODEL VALIDATOR
+# ============================================================================
+FROM python:3.11-slim AS validator
+
+LABEL stage="validator"
+LABEL description="Validates ONNX model integrity"
+
+WORKDIR /workspace
+
+# Install validation tools (minimal dependencies)
+RUN pip install --no-cache-dir \
+    onnx==1.15.0 \
+    onnxruntime==1.16.3
+
+# Copy converted models from stage 1
+COPY --from=converter /models /models
+
+# Validate all ONNX models
+RUN python -c "\
+import onnx; \
+import glob; \
+import sys; \
+print('Validating ONNX models...'); \
+onnx_files = glob.glob('/models/**/*.onnx', recursive=True); \
+print(f'Found {len(onnx_files)} ONNX files'); \
+failed = []; \
+for f in onnx_files: \
+    try: \
+        model = onnx.load(f); \
+        onnx.checker.check_model(model); \
+        print(f'✓ {f}'); \
+    except Exception as e: \
+        print(f'✗ {f}: {e}'); \
+        failed.append(f); \
+if failed: \
+    print(f'Validation failed for {len(failed)} models'); \
+    sys.exit(1); \
+else: \
+    print(f'All {len(onnx_files)} models validated successfully!'); \
+"
+
+# ============================================================================
+# STAGE 3: TRITON PRODUCTION SERVER
+# ============================================================================
+FROM nvcr.io/nvidia/tritonserver:23.10-py3
+
+LABEL stage="production"
+LABEL description="NVIDIA Triton Inference Server with ONNX models (no PyTorch)"
+
+WORKDIR /models
+
+# Copy validated ONNX models from stage 2
+COPY --from=validator /models /models
+
+# Verify no PyTorch files exist (security check)
+RUN echo "Verifying no PyTorch files..." && \
+    if find /models -name "*.pt" -o -name "*.pth" -o -name "pytorch_model.bin" | grep -q .; then \
+        echo "ERROR: Found PyTorch files in model directory!"; \
+        exit 1; \
+    else \
+        echo "✓ No PyTorch files found - safe for production"; \
+    fi
+
+# Display model inventory
+RUN echo "Model inventory:" && \
+    find /models -name "config.pbtxt" -exec dirname {} \; | sort
+
+# Health check - verify Triton can start
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:8000/v2/health/ready || exit 1
+
+# Expose Triton ports
+# 8000: HTTP inference
+# 8001: gRPC inference
+# 8002: Metrics
+EXPOSE 8000 8001 8002
+
+# Use ENTRYPOINT for proper signal handling
+ENTRYPOINT ["tritonserver"]
+
+# Default arguments (can be overridden at runtime)
+CMD ["--model-repository=/models", \
+     "--strict-model-config=false", \
+     "--log-verbose=0"]
+
+
+# ============================================================================
+# BUILD EXAMPLES
+# ============================================================================
+#
+# 1. Convert common European languages (8 models, ~20 minutes):
+#    docker build --build-arg LANGUAGES="fr,de,es,it,pt,nl,pl,ro" \
+#                 -f Dockerfile.convert \
+#                 -t triton-opus-onnx:latest .
+#
+# 2. Convert all 41 languages (60-90 minutes):
+#    docker build --build-arg LANGUAGES="ar,bg,bn,cs,da,de,el,es,et,fa,fi,fr,he,hi,hr,hu,id,it,ja,ko,lt,lv,ms,nl,pl,pt,ro,ru,sk,sl,sr,sv,ta,te,th,tr,uk,ur,vi,zh" \
+#                 --build-arg WORKERS=8 \
+#                 -f Dockerfile.convert \
+#                 -t triton-opus-onnx:all .
+#
+# 3. Convert specific languages without validation (faster):
+#    docker build --build-arg LANGUAGES="fr,de,es" \
+#                 --build-arg VALIDATE=false \
+#                 -f Dockerfile.convert \
+#                 -t triton-opus-onnx:custom .
+#
+# 4. Extract converted models to host:
+#    docker create --name temp triton-opus-onnx:latest
+#    docker cp temp:/models ./model-repository
+#    docker rm temp
+#
+# 5. Run Triton server with converted models:
+#    docker run -d --rm \
+#               -p 8000:8000 -p 8001:8001 -p 8002:8002 \
+#               --name triton-server \
+#               triton-opus-onnx:latest
+#
+# 6. Test inference:
+#    curl -X POST http://localhost:8000/v2/models/opus-mt-fr-en/infer \
+#         -H "Content-Type: application/json" \
+#         -d '{"inputs": [{"name": "INPUT_TEXT", "shape": [1], "datatype": "BYTES", "data": ["Bonjour le monde"]}]}'
+#

@@ -40,21 +40,43 @@ services:
     # Note: Base config runs CPU-only. For GPU support, use docker-compose.gpu.yml override
     # Note: Uses poll mode to allow dynamic model loading without requiring models at startup
 
+  # NER Microservice (Named Entity Recognition for 20+ languages)
+  # Handles spaCy model loading and entity extraction
+  ner-service:
+    build:
+      context: ./ner-service
+      dockerfile: Dockerfile
+      args:
+        - MODEL_SET=dev  # Use dev models for local testing (6 languages)
+    container_name: sentineltranslate-ner
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD", "python3.11", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8081/health').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sentineltranslate
+    restart: unless-stopped
+
   # FastAPI Sidecar (synchronous translation gateway)
   # Talks directly to Triton, handles hallucination detection
   sidecar:
     build:
       context: ./sidecar
       dockerfile: Dockerfile
-      args:
-        - MODEL_SET=dev  # Use dev models for local testing (6 languages)
     container_name: sentineltranslate-sidecar
     ports:
       - "8080:8080"
     environment:
       - TRITON_URL=triton:8000
+      - NER_SERVICE_URL=http://ner-service:8081
     depends_on:
       triton:
+        condition: service_healthy
+      ner-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
