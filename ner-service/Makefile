@@ -14,13 +14,13 @@ help:
 	@echo ""
 	@echo "Development targets:"
 	@echo "  make format               Format code (isort + ruff)"
-	@echo "  make lint                 Lint code (format + ruff + type check)"
+	@echo "  make lint                 Lint code (format + ruff)"
 	@echo "  make test                 Run pytest tests"
 	@echo "  make run                  Run locally with auto-reload"
 	@echo ""
 	@echo "Model download targets:"
-	@echo "  make download-all-models              Download all 21 spaCy + 60+ Stanza models (~10GB)"
-	@echo "  make download-languages LANGUAGES=en,fr,de  Download specific languages"
+	@echo "  make download-all-models              Download all models: 20 spaCy large + multilingual + 60+ Stanza (~10GB)"
+	@echo "  make download-languages LANGUAGES=en,fr,de  Download specific languages only"
 	@echo "  make download-to-volume VOLUME_PATH=/mnt/models  Download to mounted volume"
 	@echo ""
 	@echo "Container targets:"
@@ -44,10 +44,13 @@ python:
 install: python
 	uv sync
 
-# Download ALL models (21 spaCy + 60+ Stanza) to local directory
-# New volume-mounted architecture: models stored separately from container
+# Download ALL models: 20 spaCy large + 1 multilingual + 60+ Stanza
+# Volume-mounted architecture: models stored separately from container
 download-all-models:
-	@echo "Downloading ALL 21 spaCy large models and 60+ Stanza models..."
+	@echo "Downloading all NER models:"
+	@echo "  - 20 spaCy large models (one per language)"
+	@echo "  - 1 multilingual fallback model"
+	@echo "  - 60+ Stanza models"
 	@echo "This may take 30-60 minutes and requires ~10GB disk space"
 	uv run python download_all_models.py --output-dir ./models
 
@@ -101,7 +104,6 @@ format:
 
 lint: format
 	uv run ruff check . --fix
-	uv run basedpyright .
 
 test:
 	uv run pytest -q
