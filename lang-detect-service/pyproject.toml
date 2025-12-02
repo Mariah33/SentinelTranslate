@@ -1,0 +1,44 @@
+[project]
+name = "lang-detect-service"
+version = "0.1.0"
+description = "Multi-model language detection microservice with weighted consensus"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic>=2.9.0",
+    "langid>=1.1.6",
+    "fasttext-wheel>=0.9.2",
+    "langdetect>=1.0.9",
+    "lingua-language-detector>=2.0.2",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.8.0",
+    "basedpyright>=1.22.0",
+    "pytest>=8.3.0",
+    "httpx>=0.28.0",
+]
+
+[tool.ruff]
+line-length = 140
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+reportMissingModuleSource = false
+reportMissingImports = false
+exclude = ["__pycache__", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
