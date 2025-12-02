@@ -15,8 +15,7 @@ dependencies = [
     "pydantic",
     "tritonclient[http]",
     "prometheus-fastapi-instrumentator", # Prometheus metrics instrumentation
-    "langid", # Language detection for hallucination checks
-    "httpx", # HTTP client for calling NER microservice
+    "httpx", # HTTP client for calling NER and language detection microservices
     "wtpsplit>=2.0.0", # State-of-the-art multilingual sentence boundary detection
     "torch>=2.0.0", # PyTorch for wtpsplit models
     "onnxruntime>=1.16.0", # ONNX runtime (wtpsplit can use ONNX for faster inference)

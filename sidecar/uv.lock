@@ -998,16 +998,6 @@ wheels = [
 ]
 
 [[package]]
-name = "langid"
-version = "1.1.6"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
-    { name = "numpy", version = "2.3.5", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/ea/4c/0fb7d900d3b0b9c8703be316fbddffecdab23c64e1b46c7a83561d78bd43/langid-1.1.6.tar.gz", hash = "sha256:044bcae1912dab85c33d8e98f2811b8f4ff1213e5e9a9e9510137b84da2cb293", size = 1925978, upload-time = "2016-04-05T22:34:15.786Z" }
-
-[[package]]
 name = "markupsafe"
 version = "3.0.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2821,7 +2811,6 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "langid" },
     { name = "onnxruntime" },
     { name = "prometheus-fastapi-instrumentator" },
     { name = "pydantic" },
@@ -2850,7 +2839,6 @@ requires-dist = [
     { name = "basedpyright", marker = "extra == 'dev'" },
     { name = "fastapi" },
     { name = "httpx" },
-    { name = "langid" },
     { name = "onnxruntime", specifier = ">=1.16.0" },
     { name = "prometheus-fastapi-instrumentator" },
     { name = "pydantic" },

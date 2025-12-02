@@ -61,6 +61,25 @@ services:
       - sentineltranslate
     restart: unless-stopped
 
+  # Language Detection Microservice (Multi-model weighted consensus)
+  # Handles language detection with 4 models for higher accuracy
+  lang-detect-service:
+    build:
+      context: ./lang-detect-service
+      dockerfile: Dockerfile
+    container_name: sentineltranslate-lang-detect
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8082/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - sentineltranslate
+    restart: unless-stopped
+
   # FastAPI Sidecar (synchronous translation gateway)
   # Talks directly to Triton, handles hallucination detection
   sidecar:
@@ -73,10 +92,13 @@ services:
     environment:
       - TRITON_URL=triton:8000
       - NER_SERVICE_URL=http://ner-service:8081
+      - LANG_DETECT_SERVICE_URL=http://lang-detect-service:8082
     depends_on:
       triton:
         condition: service_healthy
       ner-service:
+        condition: service_healthy
+      lang-detect-service:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
