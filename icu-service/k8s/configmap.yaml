@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: icu-service-config
+  namespace: sentinel-translate
+  labels:
+    app: icu-service
+    component: config
+data:
+  # Logging configuration
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "json"
+
+  # FastAPI configuration
+  WORKERS: "4"
+
+  # ICU service configuration
+  MAX_BATCH_SIZE: "1000"
+  MAX_TEXT_LENGTH: "10000"
+
+  # Normalization settings
+  ICU_NORMALIZATION_FORM: "NFC"
+
+  # Transliteration settings
+  ICU_TRANSLITERATION_RULES: "Latin-Greek"

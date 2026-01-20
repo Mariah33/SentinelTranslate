@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: icu-service
+  namespace: sentinel-translate
+  labels:
+    app: icu-service
+    component: microservice
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8083
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: icu-service
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
