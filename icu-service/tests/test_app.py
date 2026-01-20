@@ -5,6 +5,9 @@ FastAPI endpoint tests for ICU microservice.
 from fastapi.testclient import TestClient
 from starlette import status
 
+# Use modern constant name
+HTTP_422 = status.HTTP_422_UNPROCESSABLE_CONTENT
+
 
 class TestTransliterateEndpoint:
     """Tests for /transliterate endpoint."""
@@ -63,7 +66,7 @@ class TestTransliterateEndpoint:
                 "transform_id": "Latin-ASCII",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
         data = response.json()
         # Check for either the field validation error or custom error message
         if isinstance(data, dict) and "detail" in data:
@@ -81,7 +84,7 @@ class TestTransliterateEndpoint:
                 "transform_id": "Latin-ASCII",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_transliterate_missing_transform_id(self, client: TestClient):
         """Test that missing transform_id fails validation."""
@@ -91,7 +94,7 @@ class TestTransliterateEndpoint:
                 "texts": ["Café"],
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_transliterate_response_structure(self, client: TestClient):
         """Test response structure matches TransliterateResponse."""
@@ -179,7 +182,7 @@ class TestNormalizeEndpoint:
                 "form": "INVALID",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_normalize_batch_processing(self, client: TestClient):
         """Test batch normalization."""
@@ -205,7 +208,7 @@ class TestNormalizeEndpoint:
                 "form": "NFC",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_normalize_empty_texts(self, client: TestClient):
         """Test normalization with empty texts array."""
@@ -216,7 +219,7 @@ class TestNormalizeEndpoint:
                 "form": "NFC",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
 
 class TestTransformEndpoint:
@@ -286,7 +289,7 @@ class TestTransformEndpoint:
                 "transform_spec": "::Upper;",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
 
 class TestCaseMappingEndpoint:
@@ -360,7 +363,7 @@ class TestCaseMappingEndpoint:
                 "operation": "invalid",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_case_mapping_batch(self, client: TestClient):
         """Test batch case mapping."""
@@ -386,7 +389,7 @@ class TestCaseMappingEndpoint:
                 "operation": "upper",
             },
         )
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_case_mapping_default_locale(self, client: TestClient):
         """Test case mapping without explicit locale."""
@@ -582,7 +585,7 @@ class TestErrorHandling:
     def test_missing_required_field(self, client: TestClient):
         """Test missing required field returns 422."""
         response = client.post("/transliterate", json={"texts": ["test"]})
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        assert response.status_code == HTTP_422
 
     def test_invalid_json_returns_422(self, client: TestClient):
         """Test invalid JSON returns 422."""
@@ -592,7 +595,7 @@ class TestErrorHandling:
             headers={"content-type": "application/json"},
         )
         assert response.status_code in [
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            HTTP_422,
             status.HTTP_400_BAD_REQUEST,
         ]
 
